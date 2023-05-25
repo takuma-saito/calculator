@@ -43,7 +43,7 @@ impl ops::Add<Expr> for Expr {
     type Output = Expr;
 
     fn add(self, other: Expr) -> Expr {
-        Expr::Add(Box::new(self), Box:new(other))
+        Expr::Add(Box::new(self), Box::new(other))
     }
 }
 
@@ -97,7 +97,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> {
     ops
 }
 fn build_ast<F>(exprs: &mut Vec<Expr>, op: F)
-    where F: Fn(Expr, Expr) -> Expr {
+    where F: FnOnce(Expr, Expr) -> Expr {
     let a = exprs.pop().unwrap();
     let b = exprs.pop().unwrap();
     exprs.push(op(a, b));
@@ -107,10 +107,10 @@ fn parse(text: &str) -> Expr {
     for token in tokenize(text) {
         match token {
             RpnOp::NumI64(i) => exprs.push(num(i)),
-            RpnOp::Add => { build_ast(&mut exprs, add) },
-            RpnOp::Sub => { build_ast(&mut exprs, sub) },
-            RpnOp::Div => { build_ast(&mut exprs, div) },
-            RpnOp::Mul => { build_ast(&mut exprs, mul) },
+            RpnOp::Add => { build_ast(&mut exprs, |a, b| a + b) },
+            RpnOp::Sub => { build_ast(&mut exprs, |a, b| a - b) },
+            RpnOp::Div => { build_ast(&mut exprs, |a, b| a / b) },
+            RpnOp::Mul => { build_ast(&mut exprs, |a, b| a * b) },
         }
     }
     exprs.pop().unwrap() // TODO: stack のチェック
