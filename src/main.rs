@@ -46,38 +46,19 @@ enum RpnOp {
     Mul,
     Div,
 }
-fn tokenize_num(i: &mut usize, chars: &Vec<char>) -> RpnOp { // TODO: Result 型が本来は適切
-    let mut val = 0i32;
-    while *i < chars.len() {
-        match chars[*i] {
-            c @ '0' ..= '9' => {
-                val = val * 10 + c.to_digit(10).unwrap() as i32; // TODO: i32 に収まらない場合の対応
-                *i += 1;
-            },
-            _ => { *i -= 1; break; },
-        }
-    }
-    RpnOp::Num(val)
-}
 fn tokenize(text: &str) -> Vec<RpnOp> {
     let mut i = 0usize;
     let mut ops = vec![];
-    let chars = text.chars().collect::<Vec<_>>(); 
-    while i < chars.len() {
-        let c = chars[i];
-        let u = match c {
-            ' ' => None,
-            '+' => Some(RpnOp::Add),
-            '-' => Some(RpnOp::Sub),
-            '*' => Some(RpnOp::Mul),
-            '/' => Some(RpnOp::Div),
-            _ =>   Some(tokenize_num(&mut i, &chars))
+    for token in text.split_whitespace() {
+        let rpn_op = match token {
+            " " => continue,
+            "+" => RpnOp::Add,
+            "-" => RpnOp::Sub,
+            "*" => RpnOp::Mul,
+            "/" => RpnOp::Div,
+            _ =>   RpnOp::Num(token.parse::<i32>().unwrap()),
         };
-        match u {
-            Some(op) => ops.push(op),
-            None => {},
-        }
-        i += 1;
+        ops.push(rpn_op);
     }
     ops
 }
