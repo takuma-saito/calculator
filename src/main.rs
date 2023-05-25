@@ -1,15 +1,13 @@
 
 use std::fmt;
 use std::ops::{Add, Sub, Mul, Div};
-use std::marker::PhantomData;
 
-enum Expr<T: NumOp, U: NumOp> {
-    Phantom(PhantomData<U>),
+enum Expr<T: NumOp> {
     NumI64(T),
-    Add(Box<Expr<T, U>>, Box<Expr<T, U>>),
-    Sub(Box<Expr<T, U>>, Box<Expr<T, U>>),
-    Mul(Box<Expr<T, U>>, Box<Expr<T, U>>),
-    Div(Box<Expr<T, U>>, Box<Expr<T, U>>),
+    Add(Box<Expr<T>>, Box<Expr<T>>),
+    Sub(Box<Expr<T>>, Box<Expr<T>>),
+    Mul(Box<Expr<T>>, Box<Expr<T>>),
+    Div(Box<Expr<T>>, Box<Expr<T>>),
 }
 
 struct Faction {
@@ -17,20 +15,19 @@ struct Faction {
     den: i64,
 }
 
-impl<T: NumOp, U: NumOp> Expr<T, U> {
-    fn eval(self) -> U {
+impl<T: NumOp> Expr<T> {
+    fn eval(self) -> T {
         match self {
-            Expr::NumI64(val) => val as U,
+            Expr::NumI64(val) => val,
             Expr::Add(a, b) => (*a).eval() + (*b).eval(),
             Expr::Sub(a, b) => (*a).eval() - (*b).eval(),
             Expr::Mul(a, b) => (*a).eval() * (*b).eval(),
             Expr::Div(a, b) => (*a).eval() / (*b).eval(),
-            Expr::Phantom(u) => u,
         }
     }
 }
 
-impl<T: NumOp, U: NumOp> fmt::Display for Expr<T, U> {
+impl<T: NumOp> fmt::Display for Expr<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expr::NumI64(a) => write!(f, "{}", a),
@@ -49,35 +46,35 @@ trait NumOp<T = Self, Output = Self>:
     + Div<T, Output = Output>
     + fmt::Display {}
 
-impl<T: NumOp, U: NumOp> Add for Expr<T, U> {
-    type Output = Expr<T, U>;
-    fn add(self, other: Expr<T, U>) -> Expr<T, U> {
+impl<T: NumOp> Add for Expr<T> {
+    type Output = Expr<T>;
+    fn add(self, other: Expr<T>) -> Expr<T> {
         Expr::Add(Box::new(self), Box::new(other))
     }
 }
-impl<T: NumOp, U: NumOp> Sub for Expr<T, U> {
-    type Output = Expr<T, U>;
-    fn sub(self, other: Expr<T, U>) -> Expr<T, U> {
+impl<T: NumOp> Sub for Expr<T> {
+    type Output = Expr<T>;
+    fn sub(self, other: Expr<T>) -> Expr<T> {
         Expr::Sub(Box::new(self), Box::new(other))
     }
 }
-impl<T: NumOp, U: NumOp> Mul for Expr<T, U> {
-    type Output = Expr<T, U>;
-    fn mul(self, other: Expr<T, U>) -> Expr<T, U> {
+impl<T: NumOp> Mul for Expr<T> {
+    type Output = Expr<T>;
+    fn mul(self, other: Expr<T>) -> Expr<T> {
         Expr::Mul(Box::new(self), Box::new(other))
     }
 }
-impl<T: NumOp, U: NumOp> Div for Expr<T, U> {
-    type Output = Expr<T, U>;
-    fn div(self, other: Expr<T, U>) -> Expr<T, U> {
+impl<T: NumOp> Div for Expr<T> {
+    type Output = Expr<T>;
+    fn div(self, other: Expr<T>) -> Expr<T> {
         Expr::Div(Box::new(self), Box::new(other))
     }
 }
 
-impl<T: NumOp, U: NumOp> NumOp for Expr<T, U> {}
+impl<T: NumOp> NumOp for Expr<T> {}
 impl NumOp for i64 {}
 
-fn num<U: NumOp>(val: i64) -> Expr<i64, U> { Expr::NumI64(val) }
+fn num(val: i64) -> Expr<i64> { Expr::NumI64(val) }
 
 enum RpnOp {
     NumI64(i64),
@@ -102,17 +99,17 @@ fn tokenize(text: &str) -> Vec<RpnOp> {
     }
     ops
 }
-fn build_ast<F, U>(exprs: &mut Vec<Expr<i64, U>>, op: F)
-    where F: FnOnce(Expr<i64, U>, Expr<i64, U>) -> Expr<i64, U>, U: NumOp {
+fn build_ast<F>(exprs: &mut Vec<Expr<i64>>, op: F)
+    where F: FnOnce(Expr<i64>, Expr<i64>) -> Expr<i64> {
     let a = exprs.pop().unwrap();
     let b = exprs.pop().unwrap();
     exprs.push(op(a, b));
 }
-fn parse(text: &str) -> Expr<i64, i64> {
+fn parse(text: &str) -> Expr<i64> {
     let mut exprs = vec![];
     for token in tokenize(text) {
         match token {
-            RpnOp::NumI64(i) => exprs.push(num::<64>(i)), // TODO
+            RpnOp::NumI64(i) => exprs.push(num(i)),
             RpnOp::Add => { build_ast(&mut exprs, |a, b| a + b) },
             RpnOp::Sub => { build_ast(&mut exprs, |a, b| a - b) },
             RpnOp::Div => { build_ast(&mut exprs, |a, b| a / b) },
