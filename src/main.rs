@@ -2,7 +2,7 @@
 use std::fmt;
 
 enum Expr {
-    Num(i32),
+    NumI64(i64),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
@@ -10,9 +10,9 @@ enum Expr {
 }
 
 impl Expr {
-    fn eval(self) -> i32 {
+    fn eval(self) -> i64 {
         match self {
-            Expr::Num(val) => val,
+            Expr::NumI64(val) => val,
             Expr::Add(a, b) => (*a).eval() + (*b).eval(),
             Expr::Sub(a, b) => (*a).eval() - (*b).eval(),
             Expr::Mul(a, b) => (*a).eval() * (*b).eval(),
@@ -24,7 +24,7 @@ impl Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expr::Num(a) => write!(f, "{}", a),
+            Expr::NumI64(a) => write!(f, "{}", a),
             Expr::Add(ref a, ref b) => write!(f, "({} + {})", *a, *b),
             Expr::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
             Expr::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
@@ -37,10 +37,10 @@ fn add(a: Expr, b: Expr) -> Expr { Expr::Add(Box::new(a), Box::new(b)) }
 fn sub(a: Expr, b: Expr) -> Expr { Expr::Sub(Box::new(a), Box::new(b)) }
 fn mul(a: Expr, b: Expr) -> Expr { Expr::Mul(Box::new(a), Box::new(b)) }
 fn div(a: Expr, b: Expr) -> Expr { Expr::Div(Box::new(a), Box::new(b)) }
-fn num(val: i32) -> Expr { Expr::Num(val) }
+fn num(val: i64) -> Expr { Expr::NumI64(val) }
 
 enum RpnOp {
-    Num(i32),
+    NumI64(i64),
     Add,
     Sub,
     Mul,
@@ -56,7 +56,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> {
             "-" => RpnOp::Sub,
             "*" => RpnOp::Mul,
             "/" => RpnOp::Div,
-            _ =>   RpnOp::Num(token.parse::<i32>().unwrap()),
+            _ =>   RpnOp::NumI64(token.parse::<i64>().unwrap()),
         };
         ops.push(rpn_op);
     }
@@ -72,7 +72,7 @@ fn parse(text: &str) -> Expr {
     let mut exprs = vec![];
     for token in tokenize(text) {
         match token {
-            RpnOp::Num(i) => exprs.push(num(i)),
+            RpnOp::NumI64(i) => exprs.push(num(i)),
             RpnOp::Add => { build_ast(&mut exprs, add) },
             RpnOp::Sub => { build_ast(&mut exprs, sub) },
             RpnOp::Div => { build_ast(&mut exprs, div) },
@@ -82,9 +82,19 @@ fn parse(text: &str) -> Expr {
     exprs.pop().unwrap() // TODO: stack のチェック
 }
 
+#[test]
+fn test() {
+    let mut arith = parse("1 2 +");
+    assert_eq!("(2 + 1)", format!("{}", arith));
+    assert_eq!(3, arith.eval());
+    arith = parse("3 4 + 1 2 - *");
+    assert_eq!("((2 - 1) * (4 + 3))", format!("{}", arith));
+    assert_eq!(7, arith.eval());
+    arith = parse("3 6 / 1 4 - * 10 +");
+    assert_eq!("(10 + ((4 - 1) * (6 / 3)))", format!("{}", arith));
+    assert_eq!(16, arith.eval());
+}
+
 fn main() {
-    let arith = parse("3 6 / 1 4 - * 10 +");
-    //let arith = parse("3 4 + 1 2 - *");
-    println!("{} = {}", arith.to_string(), arith.eval());
 }
 
