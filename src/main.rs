@@ -1,5 +1,5 @@
 
-mod
+use std::fmt;
 
 enum Expr {
     Num(i32),
@@ -19,15 +19,16 @@ impl Expr {
             Expr::Div(a, b) => (*a).eval() / (*b).eval(),
         }
     }
+}
 
-    
-    fn to_string(&self) -> String {
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expr::Num(ref a) => (*a).to_string(),
-            Expr::Add(ref a, ref b) => format!("({} + {})", (*a).to_string(), (*b).to_string()),
-            Expr::Sub(ref a, ref b) => format!("({} - {})", (*a).to_string(), (*b).to_string()),
-            Expr::Mul(ref a, ref b) => format!("({} * {})", (*a).to_string(), (*b).to_string()),
-            Expr::Div(ref a, ref b) => format!("({} / {})", (*a).to_string(), (*b).to_string()),
+            Expr::Num(a) => write!(f, "{}", a),
+            Expr::Add(ref a, ref b) => write!(f, "({} + {})", *a, *b),
+            Expr::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
+            Expr::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
+            Expr::Div(ref a, ref b) => write!(f, "({} / {})", *a, *b),
         }
     }
 }
