@@ -1,5 +1,6 @@
 
 use std::fmt;
+use std::ops;
 
 enum Expr {
     NumI64(i64),
@@ -7,6 +8,11 @@ enum Expr {
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+}
+
+struct Faction {
+    num: i64,
+    den: i64,
 }
 
 impl Expr {
@@ -33,10 +39,38 @@ impl fmt::Display for Expr {
     }
 }
 
-fn add(a: Expr, b: Expr) -> Expr { Expr::Add(Box::new(a), Box::new(b)) }
-fn sub(a: Expr, b: Expr) -> Expr { Expr::Sub(Box::new(a), Box::new(b)) }
-fn mul(a: Expr, b: Expr) -> Expr { Expr::Mul(Box::new(a), Box::new(b)) }
-fn div(a: Expr, b: Expr) -> Expr { Expr::Div(Box::new(a), Box::new(b)) }
+impl ops::Add<Expr> for Expr {
+    type Output = Expr;
+
+    fn add(self, other: Expr) -> Expr {
+        Expr::Add(Box::new(self), Box:new(other))
+    }
+}
+
+impl ops::Sub<Expr> for Expr {
+    type Output = Expr;
+
+    fn sub(self, other: Expr) -> Expr {
+        Expr::Sub(Box::new(self), Box::new(other))
+    }
+}
+
+impl ops::Mul<Expr> for Expr {
+    type Output = Expr;
+
+    fn mul(self, other: Expr) -> Expr {
+        Expr::Mul(Box::new(self), Box::new(other))
+    }
+}
+
+impl ops::Div<Expr> for Expr {
+    type Output = Expr;
+    
+    fn div(self, other: Expr) -> Expr {
+        Expr::Div(Box::new(self), Box::new(other))
+    }
+}
+
 fn num(val: i64) -> Expr { Expr::NumI64(val) }
 
 enum RpnOp {
