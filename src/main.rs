@@ -10,6 +10,9 @@ enum Expr {
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
+    Pow(Box<Expr>, Box<Expr>),
+    Exp(Box<Expr>),
+    Ln(Box<Expr>),
 }
 
 struct ExprPrimitive {
@@ -76,6 +79,21 @@ enum Primitive {
     F64(f64),
 }
 
+impl Primitive {
+    fn as_f64(&self) -> f64 {
+        match self {
+            Primitive::F64(val) => *val,
+            Primitive::I64(val) => (*val) as f64,
+        }
+    }
+    fn as_i64(&self) -> i64 {
+        match self {
+            Primitive::F64(val) => (*val) as i64,
+            Primitive::I64(val) => *val
+        }
+    }
+}
+
 // F64 > I64
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum CastType {
@@ -100,7 +118,7 @@ impl Ord for CastType {
 }
 
 macro_rules! impl_number_ops {
-    ($trait_name:ident, $method_name:ident) => {
+    (@binary $trait_name:ident $method_name:ident) => {
         impl $trait_name for ExprPrimitive {
             type Output = ExprPrimitive;
             fn $method_name(self, other: ExprPrimitive) -> ExprPrimitive {
@@ -122,14 +140,28 @@ macro_rules! impl_number_ops {
                 ExprPrimitive { primitive: primitive, cast_type: cast_type }
             }
         }
-    }
+    };
+    (@unary $trait_name:ident $method_name:ident) => {
+        impl $trait_name for ExprPrimitive {
+            type Output = ExprPrimitive;
+            fn $method_name(self) -> ExprPrimitive {
+                ExprPrimitive {
+                    primitive: Primitive::F64(self.primitive.as_f64().$method_name()),
+                    cast_type: CastType::F64,
+                }
+            }
+        }
+    };
 }
 
-impl_number_ops!(Add, add);
-impl_number_ops!(Sub, sub);
-impl_number_ops!(Div, div);
-impl_number_ops!(Mul, mul);
-impl_number_ops!(Rem, rem);
+impl_number_ops!(@binary Add add);
+impl_number_ops!(@binary Sub sub);
+impl_number_ops!(@binary Div div);
+impl_number_ops!(@binary Mul mul);
+impl_number_ops!(@binary Rem rem);
+impl_number_ops!(@binary Pow pow);
+impl_number_ops!(@unary Exp exp);
+impl_number_ops!(@unary Ln ln);
 
 impl fmt::Display for ExprPrimitive {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -140,23 +172,58 @@ impl fmt::Display for ExprPrimitive {
     }
 }
 
+trait Pow<Rhs = Self> {
+    type Output;
+    fn pow(self, rhs: Rhs) -> Self::Output;
+}
+
+impl Pow for i64 {
+    type Output = i64;
+    fn pow(self, other: i64) -> i64 {
+        self.pow(other as u32)
+    }
+}
+
+impl Pow for f64 {
+    type Output = f64;
+    fn pow(self, other: f64) -> f64 {
+        self.powf(other)
+    }
+}
+
+trait Exp {
+    type Output;
+    fn exp(self) -> Self::Output;
+}
+
+trait Ln {
+    type Output;
+    fn ln(self) -> Self::Output;
+}
+
 trait NumOps<T = Self, Output = Self>:
     Add<T, Output = Output>
     + Sub<T, Output = Output>
     + Mul<T, Output = Output>
     + Div<T, Output = Output>
     + Rem<T, Output = Output>
+    + Pow<T, Output = Output>
+    + Exp<Output = Output>
+    + Ln<Output = Output>
     + fmt::Display {}
 
 impl Expr {
     fn eval(self) -> ExprPrimitive {
         match self {
-            Self::ExprPrimitive(number) => number,
+            Self::ExprPrimitive(p) => p,
             Self::Add(a, b) => (*a).eval() + (*b).eval(),
             Self::Sub(a, b) => (*a).eval() - (*b).eval(),
             Self::Mul(a, b) => (*a).eval() * (*b).eval(),
             Self::Div(a, b) => (*a).eval() / (*b).eval(),
             Self::Rem(a, b) => (*a).eval() % (*b).eval(),
+            Self::Pow(a, b) => Pow::pow((*a).eval(), (*b).eval()),
+            Self::Exp(a) => Exp::exp((*a).eval()),
+            Self::Ln(a) => Ln::ln((*a).eval()),
         }
     }
 }
@@ -165,49 +232,48 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::ExprPrimitive(num) => write!(f, "{}", num),
-            Self::Add(ref a, ref b) => write!(f, "({} + {})", *a, *b),
-            Self::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
-            Self::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
-            Self::Div(ref a, ref b) => write!(f, "({} / {})", *a, *b),
-            Self::Rem(ref a, ref b) => write!(f, "({} % {})", *a, *b),
+            Self::Add(ref a, ref b)  => write!(f, "({} + {})", *a, *b),
+            Self::Sub(ref a, ref b)  => write!(f, "({} - {})", *a, *b),
+            Self::Mul(ref a, ref b)  => write!(f, "({} * {})", *a, *b),
+            Self::Div(ref a, ref b)  => write!(f, "({} / {})", *a, *b),
+            Self::Rem(ref a, ref b)  => write!(f, "({} % {})", *a, *b),
+            Self::Pow(ref a, ref b)  => write!(f, "({} ^ {})", *a, *b),
+            Self::Exp(ref a) => write!(f, "exp({})", *a),
+            Self::Ln(ref a) => write!(f, "ln({})", *a),
         }
     }
 }
 
-impl Add for Expr {
-    type Output = Expr;
-    fn add(self, other: Expr) -> Expr {
-        Self::Add(Box::new(self), Box::new(other))
-    }
+macro_rules! impl_for_expr {
+    (@binary $trait_name:ident $method_name:ident) => {
+        impl $trait_name for Expr {
+            type Output = Expr;
+            fn $method_name(self, other: Expr) -> Expr {
+                Self::$trait_name(Box::new(self), Box::new(other))
+            }
+        }
+    };
+    (@unary $trait_name:ident $method_name:ident) => {
+        impl $trait_name for Expr {
+            type Output = Expr;
+            fn $method_name(self) -> Expr {
+                Self::$trait_name(Box::new(self))
+            }
+        }
+    };
 }
-impl Sub for Expr {
-    type Output = Expr;
-    fn sub(self, other: Expr) -> Expr {
-        Self::Sub(Box::new(self), Box::new(other))
-    }
-}
-impl Mul for Expr {
-    type Output = Expr;
-    fn mul(self, other: Expr) -> Expr {
-        Self::Mul(Box::new(self), Box::new(other))
-    }
-}
-impl Div for Expr {
-    type Output = Expr;
-    fn div(self, other: Expr) -> Expr {
-        Self::Div(Box::new(self), Box::new(other))
-    }
-}
-impl Rem for Expr {
-    type Output = Expr;
-    fn rem(self, other: Expr) -> Expr {
-        Self::Rem(Box::new(self), Box::new(other))
-    }
-}
+
+impl_for_expr!(@binary Add add);
+impl_for_expr!(@binary Sub sub);
+impl_for_expr!(@binary Div div);
+impl_for_expr!(@binary Mul mul);
+impl_for_expr!(@binary Pow pow);
+impl_for_expr!(@binary Rem rem);
+impl_for_expr!(@unary Exp exp);
+impl_for_expr!(@unary Ln ln);
 
 impl NumOps for Expr {}
 impl NumOps for ExprPrimitive {}
-impl NumOps for i64 {}
 
 enum RpnOp {
     ExprPrimitive(ExprPrimitive),
@@ -216,6 +282,9 @@ enum RpnOp {
     Mul,
     Div,
     Rem,
+    Pow,
+    Exp,
+    Ln,
 }
 
 enum TokenParserState {
@@ -290,6 +359,9 @@ fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
             "*" => RpnOp::Mul,
             "/" => RpnOp::Div,
             "%" => RpnOp::Rem,
+            "^" => RpnOp::Pow,
+            "exp" => RpnOp::Exp,
+            "ln" => RpnOp::Ln,
             _ => {
                 RpnOp::ExprPrimitive(tokenize_primitive(token))
             }
@@ -298,22 +370,30 @@ fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
     }
     ops
 }
-fn build_ast<F>(exprs: &mut Vec<Expr>, op: F)
+fn build_ast_binary<F>(exprs: &mut Vec<Expr>, op: F)
     where F: FnOnce(Expr, Expr) -> Expr {
     let a = exprs.pop().unwrap();
     let b = exprs.pop().unwrap();
     exprs.push(op(a, b));
+}
+fn build_ast_unary<F>(exprs: &mut Vec<Expr>, op: F)
+    where F: FnOnce(Expr) -> Expr {
+    let a = exprs.pop().unwrap();
+    exprs.push(op(a));
 }
 fn parse(text: &str) -> Expr {
     let mut exprs = vec![];
     for token in tokenize(text) {
         match token {
             RpnOp::ExprPrimitive(num) => exprs.push(Expr::ExprPrimitive(num)),
-            RpnOp::Add => { build_ast(&mut exprs, |a, b| a + b) },
-            RpnOp::Sub => { build_ast(&mut exprs, |a, b| a - b) },
-            RpnOp::Div => { build_ast(&mut exprs, |a, b| a / b) },
-            RpnOp::Mul => { build_ast(&mut exprs, |a, b| a * b) },
-            RpnOp::Rem => { build_ast(&mut exprs, |a, b| a % b) },
+            RpnOp::Add => { build_ast_binary(&mut exprs, |a, b| a + b) },
+            RpnOp::Sub => { build_ast_binary(&mut exprs, |a, b| a - b) },
+            RpnOp::Div => { build_ast_binary(&mut exprs, |a, b| a / b) },
+            RpnOp::Mul => { build_ast_binary(&mut exprs, |a, b| a * b) },
+            RpnOp::Rem => { build_ast_binary(&mut exprs, |a, b| a % b) },
+            RpnOp::Pow => { build_ast_binary(&mut exprs, |a, b| Pow::pow(a, b)) },
+            RpnOp::Ln  => { build_ast_unary(&mut exprs, |a| Ln::ln(a)) },
+            RpnOp::Exp => { build_ast_unary(&mut exprs, |a| Exp::exp(a)) },
         }
     }
     exprs.pop().unwrap() // TODO: stack のチェック
@@ -344,4 +424,3 @@ fn test_parse() {
 
 fn main() {
 }
-
