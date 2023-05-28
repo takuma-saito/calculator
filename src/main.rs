@@ -298,7 +298,8 @@ fn test_parse() {
     parser_assert_eq!("-1", "-1", Some(-1));
     parser_assert_eq!("-1.234 1.534 *", "(1.534 * -1.234)", Some(-1.892956));
     parser_assert_eq!("-1 -1.5 *", "(-1.5 * -1)", Some(1.5));
-
+    parser_assert_eq!("-1 -1.5 *", "(-1.5 * -1)", Some(1.5));
+    parser_assert_eq!("2 3.1 4.2 / 3 1.5 + * -", "(((1.5 + 3) * (4.2 / 3.1)) - 2)", Some(4.096774193548388));
 }
 
 fn main() {
