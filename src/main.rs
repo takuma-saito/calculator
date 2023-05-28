@@ -16,21 +16,33 @@ struct ExprPrimitive {
     cast_type: CastType,
 }
 
-impl Into<ExprPrimitive> for i64 {
-    fn into(self) -> ExprPrimitive {
-        ExprPrimitive {
-            primitive: Primitive::I64(self),
+impl From<i64> for ExprPrimitive {
+    fn from(value: i64) -> Self {
+        Self {
+            primitive: Primitive::I64(value),
             cast_type: CastType::I64,
         }
     }
 }
 
-impl Into<ExprPrimitive> for f64 {
-    fn into(self) -> ExprPrimitive {
-        ExprPrimitive {
-            primitive: Primitive::F64(self),
+impl From<ExprPrimitive> for Option<i64> {
+    fn from(value: ExprPrimitive) -> Option<i64> {
+        if let Primitive::I64(val) = value.primitive { Some(val) } else { None }
+    }
+}
+
+impl From<f64> for ExprPrimitive {
+    fn from(value: f64) -> Self {
+        Self {
+            primitive: Primitive::F64(value),
             cast_type: CastType::F64,
         }
+    }
+}
+
+impl From<ExprPrimitive> for Option<f64> {
+    fn from(value: ExprPrimitive) -> Option<f64> {
+        if let Primitive::F64(val) = value.primitive { Some(val) } else { None }
     }
 }
 
@@ -59,12 +71,6 @@ impl PartialOrd for CastType {
 impl Ord for CastType {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
-    }
-}
-
-impl ExprPrimitive {
-    fn get_i64(&self) -> Option<i64> {
-        if let Primitive::I64(val) = &self.primitive { Some(*val) } else { None }
     }
 }
 
@@ -179,8 +185,8 @@ enum RpnOp {
 enum TokenParserState {
     Beginning,
     Sign(bool),
-    Decimal(i64),
-    Float(f64),
+    NatNum(bool, u64),
+    Decimal(bool, u64, u64, i32),
 }
 
 // @startuml
@@ -205,36 +211,40 @@ fn tokenize_primitive(token: &str) -> ExprPrimitive { // TODO: Result 型
                 state = match ch {
                     '-'   => TokenParserState::Sign(false),
                     '+'   => TokenParserState::Sign(true),
-                    '0' ..= '9' => TokenParserState::Decimal(ch.to_digit(10).unwrap() as i64),
+                    '0' ..= '9' => TokenParserState::NatNum(true, ch.to_digit(10).unwrap() as u64),
                     _ => panic!("Unexpected token {}", ch),
                 };
             },
             TokenParserState::Sign(b) => {
-                let d = ch.to_digit(10).unwrap() as i64;
-                state = TokenParserState::Decimal(if b {d} else { -1 * d });
+                let d = ch.to_digit(10).unwrap() as u64;
+                state = TokenParserState::NatNum(b, d);
             },
-            TokenParserState::Decimal(val) => {
+            TokenParserState::NatNum(sign, val) => {
                 state = if ch != '.' {
-                    let d = ch.to_digit(10).unwrap() as i64;
-                    TokenParserState::Decimal(val * 10 + d) // TODO u64 を超える場合を考慮
+                    let d = ch.to_digit(10).unwrap() as u64;
+                    TokenParserState::NatNum(sign, val * 10 + d) // TODO u64 を超える場合を考慮
                 } else {
-                    TokenParserState::Float(val as f64)
+                    TokenParserState::Decimal(sign, val, 0_u64, 0)
                 };
             },
-            TokenParserState::Float(val) => {
-                let newval = val * 10.0 + f64::from(ch.to_digit(10).unwrap()); // TODO: f64 を超える場合を考慮
-                state = TokenParserState::Float(newval);
+            TokenParserState::Decimal(sign, val, decimal_val, pos) => {
+                let new_decimal_val = 10_u64 * decimal_val + (ch.to_digit(10).unwrap() as u64); // TODO: f64 を超える場合を考慮
+                state = TokenParserState::Decimal(sign, val, new_decimal_val, pos - 1);
             },
         }
     }
     match state {
-        TokenParserState::Decimal(val) => val.into(),
-        TokenParserState::Float(val)   => val.into(),
+        TokenParserState::NatNum(sign, val)  => 
+            (if sign { val as i64 } else { -(val as i64) }).into(),
+        TokenParserState::Decimal(sign, val, decimal_val, pos) => {
+            let v = (val as f64) + (decimal_val as f64) * (10.0_f64).powi(pos);
+            let ret = if sign { v } else { -v };
+            ret.into()
+        },
         _ => panic!("Parse Faild"), // TODO: 適切なエラーを返却
     }
 }
 fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
-    let mut i = 0usize;
     let mut ops = vec![];
     for token in text.split_whitespace() {
         let rpn_op = match token {
@@ -271,21 +281,28 @@ fn parse(text: &str) -> Expr {
     exprs.pop().unwrap() // TODO: stack のチェック
 }
 
-fn eval_and_get_i64(arith: Expr) -> i64 {
-    arith.eval().get_i64().unwrap()
-}
-
 #[test]
 fn test() {
     let mut arith = parse("1 2 +");
     assert_eq!("(2 + 1)", format!("{}", arith));
-    assert_eq!(3i64, eval_and_get_i64(arith));
+    assert_eq!(Some(3_i64), arith.eval().into());
     arith = parse("3 4 + 1 2 - *");
     assert_eq!("((2 - 1) * (4 + 3))", format!("{}", arith));
-    assert_eq!(7i64, eval_and_get_i64(arith));
+    assert_eq!(Some(7_i64), arith.eval().into());
     arith = parse("3 6 / 1 4 - * 10 +");
     assert_eq!("(10 + ((4 - 1) * (6 / 3)))", format!("{}", arith));
-    assert_eq!(16i64, eval_and_get_i64(arith));
+    assert_eq!(Some(16_i64), arith.eval().into());
+
+    arith = parse("3.1 2.4 +");
+    assert_eq!(Some(3.1_f64 + 2.4_f64), arith.eval().into());
+
+    arith = parse("-1");
+    assert_eq!("-1", format!("{}", arith));
+    assert_eq!(Some(-1), arith.eval().into());
+
+    arith = parse("-1.234 1.534 *");
+    assert_eq!("(1.534 * -1.234)", format!("{}", arith));
+    assert_eq!(Some(-1.892956), arith.eval().into());
 }
 
 fn main() {
