@@ -123,7 +123,7 @@ impl Ord for CastType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Fraction {
     top: i64,
     bottom: i64,
@@ -136,6 +136,9 @@ fn gcd(a: i64, b: i64) -> i64 {
 
 impl Fraction {
     // TODO: パフォーマンス課題
+    fn new(top: i64, bottom: i64) -> Fraction {
+        Fraction { top: top, bottom: bottom }
+    }
     fn simplify(self) -> Fraction {
         let Fraction { top: a, bottom: b } = self;
         let g = gcd(a, b);
@@ -143,6 +146,13 @@ impl Fraction {
             top: a/g,
             bottom: b/g,
         }
+    }
+}
+
+impl From<ExprPrimitive> for Option<Fraction> {
+    fn from(value: ExprPrimitive) -> Option<Fraction> {
+        let ExprPrimitive { primitive: primitive, .. } = value;
+        if let Primitive::Fraction(val) = primitive { Some(val) } else { None }
     }
 }
 
@@ -573,6 +583,8 @@ fn test_parse() {
     parser_assert_eq!("5 3 **", "(3 ** 5)", Some(243));
     parser_assert_eq!("4 2.21234 **", "(2.21234 ** 4)", Some(23.955623922523824));
     parser_assert_eq!("2.5 3 **", "(3 ** 2.5)", Some(15.588457268119896));
+    parser_assert_eq!("3 5 //", "(5 // 3)", Some(Fraction::new(5, 3)));
+    parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 // 3) + (8 // 7)) * (5 // 3))", Some(Fraction::new(260, 63)));
 }
 
 fn main() -> io::Result<()> {
