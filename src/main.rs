@@ -12,6 +12,7 @@ enum Expr {
     Div(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
     Pow(Box<Expr>, Box<Expr>),
+    FracDiv(Box<Expr>, Box<Expr>),
     Exp(Box<Expr>),
     Ln(Box<Expr>),
 }
@@ -284,6 +285,25 @@ macro_rules! impl_number_ops {
     };
 }
 
+trait FracDiv<Rhs = Self> {
+    type Output;
+    fn div(self, other: Rhs) -> Self::Output;
+}
+
+impl FracDiv for ExprPrimitive {
+    type Output = ExprPrimitive;
+    fn div(self, other: ExprPrimitive) -> ExprPrimitive {
+        let primitive = match (self.primitive, other.primitive) {
+            (Primitive::I64(x), Primitive::I64(y)) => 
+                Primitive::Fraction(Fraction { top: x, bottom: y}),
+            (a, b) => {
+                panic!("Fraction divion error: {} {}", a, b);
+            }
+        };
+        ExprPrimitive { primitive: primitive, cast_type: CastType::Fraction }
+    }
+}
+
 impl_number_ops!(@binary Add add);
 impl_number_ops!(@binary Sub sub);
 impl_number_ops!(@binary Div div);
@@ -331,6 +351,7 @@ trait NumOps<T = Self, Output = Self>:
     + Pow<T, Output = Output>
     + Exp<Output = Output>
     + Ln<Output = Output>
+    + FracDiv<T, Output = Output>
     + fmt::Display {}
 
 impl Expr {
@@ -345,6 +366,7 @@ impl Expr {
             Self::Pow(a, b) => Pow::pow((*a).eval(), (*b).eval()),
             Self::Exp(a) => Exp::exp((*a).eval()),
             Self::Ln(a) => Ln::ln((*a).eval()),
+            Self::FracDiv(a, b) => FracDiv::div((*a).eval(), (*b).eval()),
         }
     }
 }
@@ -361,6 +383,7 @@ impl fmt::Display for Expr {
             Self::Pow(ref a, ref b)  => write!(f, "({} ** {})", *a, *b),
             Self::Exp(ref a) => write!(f, "exp({})", *a),
             Self::Ln(ref a) => write!(f, "ln({})", *a),
+            Self::FracDiv(ref a, ref b) => write!(f, "({} // {})", *a, *b),
         }
     }
 }
@@ -392,6 +415,7 @@ impl_for_expr!(@binary Rem rem);
 impl_for_expr!(@binary Pow pow);
 impl_for_expr!(@unary Exp exp);
 impl_for_expr!(@unary Ln ln);
+impl_for_expr!(@binary FracDiv div);
 
 impl NumOps for Expr {}
 impl NumOps for ExprPrimitive {}
@@ -406,6 +430,7 @@ enum RpnOp {
     Pow,
     Exp,
     Ln,
+    FracDiv,
 }
 
 enum TokenParserState {
@@ -483,6 +508,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
             "**" => RpnOp::Pow,
             "exp" => RpnOp::Exp,
             "ln" => RpnOp::Ln,
+            "//" => RpnOp::FracDiv,
             _ => {
                 RpnOp::ExprPrimitive(tokenize_primitive(token))
             }
@@ -515,6 +541,7 @@ fn parse<N: AsRef<str>>(text: N) -> Expr {
             RpnOp::Pow => { build_ast_binary(&mut exprs, |a, b| Pow::pow(a, b)) },
             RpnOp::Ln  => { build_ast_unary(&mut exprs, |a| Ln::ln(a)) },
             RpnOp::Exp => { build_ast_unary(&mut exprs, |a| Exp::exp(a)) },
+            RpnOp::FracDiv => { build_ast_binary(&mut exprs, |a, b| FracDiv::div(a, b)) },
         }
     }
     exprs.pop().unwrap() // TODO: stack のチェック
