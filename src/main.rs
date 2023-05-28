@@ -1,6 +1,6 @@
 
 use std::fmt;
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Sub, Mul, Div, Rem};
 use std::cmp::Ordering;
 
 enum Expr {
@@ -9,6 +9,7 @@ enum Expr {
     Sub(Box<Expr>, Box<Expr>),
     Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
+    Rem(Box<Expr>, Box<Expr>),
 }
 
 struct ExprPrimitive {
@@ -22,6 +23,18 @@ impl From<i64> for ExprPrimitive {
             primitive: Primitive::I64(value),
             cast_type: CastType::I64,
         }
+    }
+}
+
+impl From<i32> for ExprPrimitive {
+    fn from(value: i32) -> Self {
+        (value as i64).into()
+    }
+}
+
+impl From<ExprPrimitive> for Option<i32> {
+    fn from(value: ExprPrimitive) -> Option<i32> {
+        Option::<i64>::from(value).map(|v| v as i32)
     }
 }
 
@@ -40,9 +53,21 @@ impl From<f64> for ExprPrimitive {
     }
 }
 
+impl From<f32> for ExprPrimitive {
+    fn from(value: f32) -> Self {
+        (value as f64).into()
+    }
+}
+
 impl From<ExprPrimitive> for Option<f64> {
     fn from(value: ExprPrimitive) -> Option<f64> {
         if let Primitive::F64(val) = value.primitive { Some(val) } else { None }
+    }
+}
+
+impl From<ExprPrimitive> for Option<f32> {
+    fn from(value: ExprPrimitive) -> Option<f32> {
+        Option::<f64>::from(value).map(|v| v as f32)
     }
 }
 
@@ -104,6 +129,7 @@ impl_number_ops!(Add, add);
 impl_number_ops!(Sub, sub);
 impl_number_ops!(Div, div);
 impl_number_ops!(Mul, mul);
+impl_number_ops!(Rem, rem);
 
 impl fmt::Display for ExprPrimitive {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -119,6 +145,7 @@ trait NumOps<T = Self, Output = Self>:
     + Sub<T, Output = Output>
     + Mul<T, Output = Output>
     + Div<T, Output = Output>
+    + Rem<T, Output = Output>
     + fmt::Display {}
 
 impl Expr {
@@ -129,6 +156,7 @@ impl Expr {
             Self::Sub(a, b) => (*a).eval() - (*b).eval(),
             Self::Mul(a, b) => (*a).eval() * (*b).eval(),
             Self::Div(a, b) => (*a).eval() / (*b).eval(),
+            Self::Rem(a, b) => (*a).eval() % (*b).eval(),
         }
     }
 }
@@ -141,6 +169,7 @@ impl fmt::Display for Expr {
             Self::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
             Self::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
             Self::Div(ref a, ref b) => write!(f, "({} / {})", *a, *b),
+            Self::Rem(ref a, ref b) => write!(f, "({} % {})", *a, *b),
         }
     }
 }
@@ -169,6 +198,12 @@ impl Div for Expr {
         Self::Div(Box::new(self), Box::new(other))
     }
 }
+impl Rem for Expr {
+    type Output = Expr;
+    fn rem(self, other: Expr) -> Expr {
+        Self::Rem(Box::new(self), Box::new(other))
+    }
+}
 
 impl NumOps for Expr {}
 impl NumOps for ExprPrimitive {}
@@ -180,6 +215,7 @@ enum RpnOp {
     Sub,
     Mul,
     Div,
+    Rem,
 }
 
 enum TokenParserState {
@@ -253,6 +289,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
             "-" => RpnOp::Sub,
             "*" => RpnOp::Mul,
             "/" => RpnOp::Div,
+            "%" => RpnOp::Rem,
             _ => {
                 RpnOp::ExprPrimitive(tokenize_primitive(token))
             }
@@ -276,6 +313,7 @@ fn parse(text: &str) -> Expr {
             RpnOp::Sub => { build_ast(&mut exprs, |a, b| a - b) },
             RpnOp::Div => { build_ast(&mut exprs, |a, b| a / b) },
             RpnOp::Mul => { build_ast(&mut exprs, |a, b| a * b) },
+            RpnOp::Rem => { build_ast(&mut exprs, |a, b| a % b) },
         }
     }
     exprs.pop().unwrap() // TODO: stack のチェック
@@ -291,15 +329,17 @@ macro_rules! parser_assert_eq {
 
 #[test]
 fn test_parse() {
-    parser_assert_eq!("1 2 +", "(2 + 1)", Some(3_i64));
-    parser_assert_eq!("3 4 + 1 2 - *", "((2 - 1) * (4 + 3))", Some(7_i64));
-    parser_assert_eq!("3 6 / 1 4 - * 10 +", "(10 + ((4 - 1) * (6 / 3)))", Some(16_i64));
-    parser_assert_eq!("3.1 2.4 +", "(2.4 + 3.1)", Some(5.5_f64));
+    parser_assert_eq!("1 2 +", "(2 + 1)", Some(3));
+    parser_assert_eq!("3 4 + 1 2 - *", "((2 - 1) * (4 + 3))", Some(7));
+    parser_assert_eq!("3 6 / 1 4 - * 10 +", "(10 + ((4 - 1) * (6 / 3)))", Some(16));
+    parser_assert_eq!("3.1 2.4 +", "(2.4 + 3.1)", Some(5.5));
     parser_assert_eq!("-1", "-1", Some(-1));
     parser_assert_eq!("-1.234 1.534 *", "(1.534 * -1.234)", Some(-1.892956));
     parser_assert_eq!("-1 -1.5 *", "(-1.5 * -1)", Some(1.5));
     parser_assert_eq!("-1 -1.5 *", "(-1.5 * -1)", Some(1.5));
     parser_assert_eq!("2 3.1 4.2 / 3 1.5 + * -", "(((1.5 + 3) * (4.2 / 3.1)) - 2)", Some(4.096774193548388));
+    parser_assert_eq!("9 100 %", "(100 % 9)", Some(1));
+    parser_assert_eq!("9 100 % 1 +", "(1 + (100 % 9))", Some(2));
 }
 
 fn main() {
