@@ -17,63 +17,36 @@ enum Number {
 
 impl Number {
     fn get_i64(&self) -> Option<i64> {
-        if let Number::I64(val) = &self { Some(*val) } else { None }
+        if let Self::I64(val) = &self { Some(*val) } else { None }
     }
 }
 
-impl Sub for Number {
-    type Output = Number;
-    fn sub(self, other: Number) -> Number {
-        match (self, other) {
-            (Number::I64(x), Number::I64(y)) => Number::I64(x - y),
-            (Number::I64(x), Number::I32(y)) => Number::I64(x - y as i64),
-            (Number::I32(x), Number::I64(y)) => Number::I64(x as i64 - y),
-            (Number::I32(x), Number::I32(y)) => Number::I32(x - y),
+macro_rules! impl_number_ops {
+    ($trait_name:ident, $method_name:ident) => {
+        impl $trait_name for Number {
+            type Output = Number;
+            fn $method_name(self, other: Number) -> Number {
+                match (self, other) {
+                    (Self::I64(x), Self::I64(y)) => Self::I64($trait_name::$method_name(x, y)),
+                    (Self::I64(x), Self::I32(y)) => Self::I64($trait_name::$method_name(x, y as i64)),
+                    (Self::I32(x), Self::I64(y)) => Self::I64($trait_name::$method_name(x as i64, y)),
+                    (Self::I32(x), Self::I32(y)) => Self::I32($trait_name::$method_name(x, y)),
+                }
+            }
         }
     }
 }
 
-impl Add for Number {
-    type Output = Number;
-    fn add(self, other: Number) -> Number {
-        match (self, other) {
-            (Number::I64(x), Number::I64(y)) => Number::I64(x + y),
-            (Number::I64(x), Number::I32(y)) => Number::I64(x + y as i64),
-            (Number::I32(x), Number::I64(y)) => Number::I64(x as i64 + y),
-            (Number::I32(x), Number::I32(y)) => Number::I32(x + y),
-        }
-    }
-}
-
-impl Mul for Number {
-    type Output = Number;
-    fn mul(self, other: Number) -> Number {
-        match (self, other) {
-            (Number::I64(x), Number::I64(y)) => Number::I64(x * y),
-            (Number::I64(x), Number::I32(y)) => Number::I64(x * y as i64),
-            (Number::I32(x), Number::I64(y)) => Number::I64(x as i64 * y),
-            (Number::I32(x), Number::I32(y)) => Number::I32(x * y),
-        }
-    }
-}
-
-impl Div for Number {
-    type Output = Number;
-    fn div(self, other: Number) -> Number {
-        match (self, other) {
-            (Number::I64(x), Number::I64(y)) => Number::I64(x / y),
-            (Number::I64(x), Number::I32(y)) => Number::I64(x / y as i64),
-            (Number::I32(x), Number::I64(y)) => Number::I64(x as i64 / y),
-            (Number::I32(x), Number::I32(y)) => Number::I32(x / y),
-        }
-    }
-}
+impl_number_ops!(Add, add);
+impl_number_ops!(Sub, sub);
+impl_number_ops!(Div, div);
+impl_number_ops!(Mul, mul);
 
 impl fmt::Display for Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Number::I64(val) => write!(f, "{}", val),
-            Number::I32(val) => write!(f, "{}", val),
+            Self::I64(val) => write!(f, "{}", val),
+            Self::I32(val) => write!(f, "{}", val),
         }
     }
 }
@@ -88,11 +61,11 @@ trait NumOps<T = Self, Output = Self>:
 impl Expr {
     fn eval(self) -> Number {
         match self {
-            Expr::Number(number) => number,
-            Expr::Add(a, b) => Add::add((*a).eval(), (*b).eval()),
-            Expr::Sub(a, b) => Sub::sub((*a).eval(), (*b).eval()),
-            Expr::Mul(a, b) => Mul::mul((*a).eval(), (*b).eval()),
-            Expr::Div(a, b) => Div::div((*a).eval(), (*b).eval()),
+            Self::Number(number) => number,
+            Self::Add(a, b) => Add::add((*a).eval(), (*b).eval()),
+            Self::Sub(a, b) => Sub::sub((*a).eval(), (*b).eval()),
+            Self::Mul(a, b) => Mul::mul((*a).eval(), (*b).eval()),
+            Self::Div(a, b) => Div::div((*a).eval(), (*b).eval()),
         }
     }
 }
@@ -100,11 +73,11 @@ impl Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expr::Number(num) => write!(f, "{}", num),
-            Expr::Add(ref a, ref b) => write!(f, "({} + {})", *a, *b),
-            Expr::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
-            Expr::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
-            Expr::Div(ref a, ref b) => write!(f, "({} / {})", *a, *b),
+            Self::Number(num) => write!(f, "{}", num),
+            Self::Add(ref a, ref b) => write!(f, "({} + {})", *a, *b),
+            Self::Sub(ref a, ref b) => write!(f, "({} - {})", *a, *b),
+            Self::Mul(ref a, ref b) => write!(f, "({} * {})", *a, *b),
+            Self::Div(ref a, ref b) => write!(f, "({} / {})", *a, *b),
         }
     }
 }
@@ -112,25 +85,25 @@ impl fmt::Display for Expr {
 impl Add for Expr {
     type Output = Expr;
     fn add(self, other: Expr) -> Expr {
-        Expr::Add(Box::new(self), Box::new(other))
+        Self::Add(Box::new(self), Box::new(other))
     }
 }
 impl Sub for Expr {
     type Output = Expr;
     fn sub(self, other: Expr) -> Expr {
-        Expr::Sub(Box::new(self), Box::new(other))
+        Self::Sub(Box::new(self), Box::new(other))
     }
 }
 impl Mul for Expr {
     type Output = Expr;
     fn mul(self, other: Expr) -> Expr {
-        Expr::Mul(Box::new(self), Box::new(other))
+        Self::Mul(Box::new(self), Box::new(other))
     }
 }
 impl Div for Expr {
     type Output = Expr;
     fn div(self, other: Expr) -> Expr {
-        Expr::Div(Box::new(self), Box::new(other))
+        Self::Div(Box::new(self), Box::new(other))
     }
 }
 
