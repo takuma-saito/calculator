@@ -237,7 +237,7 @@ impl fmt::Display for Expr {
             Self::Mul(ref a, ref b)  => write!(f, "({} * {})", *a, *b),
             Self::Div(ref a, ref b)  => write!(f, "({} / {})", *a, *b),
             Self::Rem(ref a, ref b)  => write!(f, "({} % {})", *a, *b),
-            Self::Pow(ref a, ref b)  => write!(f, "({} ^ {})", *a, *b),
+            Self::Pow(ref a, ref b)  => write!(f, "({} ** {})", *a, *b),
             Self::Exp(ref a) => write!(f, "exp({})", *a),
             Self::Ln(ref a) => write!(f, "ln({})", *a),
         }
@@ -359,7 +359,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
             "*" => RpnOp::Mul,
             "/" => RpnOp::Div,
             "%" => RpnOp::Rem,
-            "^" => RpnOp::Pow,
+            "**" => RpnOp::Pow,
             "exp" => RpnOp::Exp,
             "ln" => RpnOp::Ln,
             _ => {
@@ -420,7 +420,13 @@ fn test_parse() {
     parser_assert_eq!("2 3.1 4.2 / 3 1.5 + * -", "(((1.5 + 3) * (4.2 / 3.1)) - 2)", Some(4.096774193548388));
     parser_assert_eq!("9 100 %", "(100 % 9)", Some(1));
     parser_assert_eq!("9 100 % 1 +", "(1 + (100 % 9))", Some(2));
+    parser_assert_eq!("2.0 exp", "exp(2)", Some(7.38905609893065));
+    parser_assert_eq!("2.0 ln", "ln(2)", Some(0.6931471805599453));
+    parser_assert_eq!("5 3 **", "(3 ** 5)", Some(243));
+    parser_assert_eq!("4 2.21234 **", "(2.21234 ** 4)", Some(23.955623922523824));
+    parser_assert_eq!("2.5 3 **", "(3 ** 2.5)", Some(15.588457268119896));
 }
 
 fn main() {
+    
 }
