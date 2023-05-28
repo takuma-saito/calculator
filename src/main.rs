@@ -78,6 +78,7 @@ impl From<ExprPrimitive> for Option<f32> {
 enum Primitive {
     I64(i64),
     F64(f64),
+    Fraction(Fraction),
 }
 
 impl Primitive {
@@ -85,21 +86,24 @@ impl Primitive {
         match self {
             Primitive::F64(val) => *val,
             Primitive::I64(val) => (*val) as f64,
+            Primitive::Fraction(frac) => (frac.top as f64) / (frac.bottom as f64)
         }
     }
     fn as_i64(&self) -> i64 {
         match self {
             Primitive::F64(val) => (*val) as i64,
-            Primitive::I64(val) => *val
+            Primitive::I64(val) => *val,
+            Primitive::Fraction(frac) => frac.top / frac.bottom,
         }
     }
 }
 
-// F64 > I64
-#[derive(Copy, Clone, PartialEq, Eq)]
+// F64 > Fraction > I64
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum CastType {
     I64,
-    F64, 
+    F64,
+    Fraction,
 }
 
 impl PartialOrd for CastType {
@@ -118,7 +122,7 @@ impl Ord for CastType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Fraction {
     top: i64,
     bottom: i64,
@@ -185,6 +189,53 @@ impl Div for Fraction {
     }
 }
 
+// TODO: 実装存在しない場合の処理検討
+impl Rem for Fraction {
+    type Output = Fraction;
+    fn rem(self, other: Fraction) -> Fraction {
+        unimplemented!()
+    }
+}
+
+// TODO: 実装存在しない場合の処理検討
+impl Pow for Fraction {
+    type Output = Fraction;
+    fn pow(self, other: Fraction) -> Fraction {
+        unimplemented!()
+    }
+}
+
+impl fmt::Display for Fraction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}//{})", self.top, self.bottom)
+    }
+}
+impl fmt::Display for ExprPrimitive {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.primitive)
+    }
+}
+impl fmt::Display for Primitive {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::I64(val) => write!(f, "{}", val),
+            Self::F64(val) => write!(f, "{}", val),
+            Self::Fraction(val) => write!(f, "{}", val),
+        }
+    }
+}
+
+trait ToFrac {
+    fn to_frac(self) -> Fraction;
+}
+
+impl ToFrac for i64 {
+    fn to_frac(self) -> Fraction {
+        Fraction { top: self, bottom: 1 }
+    }
+}
+
+// TODO: Fraction と F64 の変数変換
 macro_rules! impl_number_ops {
     (@binary $trait_name:ident $method_name:ident) => {
         impl $trait_name for ExprPrimitive {
@@ -192,10 +243,18 @@ macro_rules! impl_number_ops {
             fn $method_name(self, other: ExprPrimitive) -> ExprPrimitive {
                 let cast_type = self.cast_type.max(other.cast_type);
                 let primitive = match (self.primitive, other.primitive, cast_type) {
+                    (Primitive::I64(x), Primitive::I64(y), CastType::Fraction) =>
+                        Primitive::Fraction($trait_name::$method_name(x.to_frac(), y.to_frac())),
                     (Primitive::I64(x), Primitive::I64(y), _) =>
                         Primitive::I64($trait_name::$method_name(x, y)),
                     (Primitive::F64(x), Primitive::F64(y), _) =>
                         Primitive::F64($trait_name::$method_name(x, y)),
+                    (Primitive::Fraction(x), Primitive::Fraction(y), _) => 
+                        Primitive::Fraction($trait_name::$method_name(x, y)),
+                    (Primitive::I64(x), Primitive::Fraction(y), _) =>
+                        Primitive::Fraction($trait_name::$method_name(x.to_frac(), y)),
+                    (Primitive::Fraction(x), Primitive::I64(y), _) =>
+                        Primitive::Fraction($trait_name::$method_name(x, y.to_frac())),
                     (Primitive::I64(x), Primitive::F64(y), CastType::I64) =>
                         Primitive::I64($trait_name::$method_name(x, y as i64)),
                     (Primitive::I64(x), Primitive::F64(y), CastType::F64) =>
@@ -204,6 +263,9 @@ macro_rules! impl_number_ops {
                         Primitive::I64($trait_name::$method_name(x as i64, y)),
                     (Primitive::F64(x), Primitive::I64(y), CastType::F64) =>
                         Primitive::F64($trait_name::$method_name(x, y as f64)),
+                    (a, b, c) => {
+                        panic!("convert error: {} {} {:?}", a, b, c);
+                    }
                 };
                 ExprPrimitive { primitive: primitive, cast_type: cast_type }
             }
@@ -230,15 +292,6 @@ impl_number_ops!(@binary Rem rem);
 impl_number_ops!(@binary Pow pow);
 impl_number_ops!(@unary Exp exp);
 impl_number_ops!(@unary Ln ln);
-
-impl fmt::Display for ExprPrimitive {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.primitive {
-            Primitive::I64(val) => write!(f, "{}", val),
-            Primitive::F64(val) => write!(f, "{}", val),
-        }
-    }
-}
 
 trait Pow<Rhs = Self> {
     type Output;
@@ -335,8 +388,8 @@ impl_for_expr!(@binary Add add);
 impl_for_expr!(@binary Sub sub);
 impl_for_expr!(@binary Div div);
 impl_for_expr!(@binary Mul mul);
-impl_for_expr!(@binary Pow pow);
 impl_for_expr!(@binary Rem rem);
+impl_for_expr!(@binary Pow pow);
 impl_for_expr!(@unary Exp exp);
 impl_for_expr!(@unary Ln ln);
 
