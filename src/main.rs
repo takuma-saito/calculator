@@ -136,7 +136,7 @@ fn gcd(a: i64, b: i64) -> i64 {
 impl Fraction {
     // TODO: パフォーマンス課題
     fn simplify(self) -> Fraction {
-        let Fraction { top: a, bottom: b } = self.clone();
+        let Fraction { top: a, bottom: b } = self;
         let g = gcd(a, b);
         Fraction {
             top: a/g,
@@ -337,11 +337,11 @@ impl Expr {
     fn eval(self) -> ExprPrimitive {
         match self {
             Self::ExprPrimitive(p) => p,
-            Self::Add(a, b) => (*a).eval() + (*b).eval(),
-            Self::Sub(a, b) => (*a).eval() - (*b).eval(),
-            Self::Mul(a, b) => (*a).eval() * (*b).eval(),
-            Self::Div(a, b) => (*a).eval() / (*b).eval(),
-            Self::Rem(a, b) => (*a).eval() % (*b).eval(),
+            Self::Add(a, b) => Add::add((*a).eval(), (*b).eval()),
+            Self::Sub(a, b) => Sub::sub((*a).eval(), (*b).eval()),
+            Self::Mul(a, b) => Mul::mul((*a).eval(), (*b).eval()),
+            Self::Div(a, b) => Div::div((*a).eval(), (*b).eval()),
+            Self::Rem(a, b) => Rem::rem((*a).eval(), (*b).eval()),
             Self::Pow(a, b) => Pow::pow((*a).eval(), (*b).eval()),
             Self::Exp(a) => Exp::exp((*a).eval()),
             Self::Ln(a) => Ln::ln((*a).eval()),
@@ -507,11 +507,11 @@ fn parse<N: AsRef<str>>(text: N) -> Expr {
     for token in tokenize(text.as_ref()) {
         match token {
             RpnOp::ExprPrimitive(num) => exprs.push(Expr::ExprPrimitive(num)),
-            RpnOp::Add => { build_ast_binary(&mut exprs, |a, b| a + b) },
-            RpnOp::Sub => { build_ast_binary(&mut exprs, |a, b| a - b) },
-            RpnOp::Div => { build_ast_binary(&mut exprs, |a, b| a / b) },
-            RpnOp::Mul => { build_ast_binary(&mut exprs, |a, b| a * b) },
-            RpnOp::Rem => { build_ast_binary(&mut exprs, |a, b| a % b) },
+            RpnOp::Add => { build_ast_binary(&mut exprs, |a, b| Add::add(a, b)) },
+            RpnOp::Sub => { build_ast_binary(&mut exprs, |a, b| Sub::sub(a, b)) },
+            RpnOp::Div => { build_ast_binary(&mut exprs, |a, b| Div::div(a, b)) },
+            RpnOp::Mul => { build_ast_binary(&mut exprs, |a, b| Mul::mul(a, b)) },
+            RpnOp::Rem => { build_ast_binary(&mut exprs, |a, b| Rem::rem(a, b)) },
             RpnOp::Pow => { build_ast_binary(&mut exprs, |a, b| Pow::pow(a, b)) },
             RpnOp::Ln  => { build_ast_unary(&mut exprs, |a| Ln::ln(a)) },
             RpnOp::Exp => { build_ast_unary(&mut exprs, |a| Exp::exp(a)) },
