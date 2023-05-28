@@ -1,4 +1,5 @@
 
+use std::io;
 use std::fmt;
 use std::ops::{Add, Sub, Mul, Div, Rem};
 use std::cmp::Ordering;
@@ -381,9 +382,9 @@ fn build_ast_unary<F>(exprs: &mut Vec<Expr>, op: F)
     let a = exprs.pop().unwrap();
     exprs.push(op(a));
 }
-fn parse(text: &str) -> Expr {
+fn parse<N: AsRef<str>>(text: N) -> Expr {
     let mut exprs = vec![];
-    for token in tokenize(text) {
+    for token in tokenize(text.as_ref()) {
         match token {
             RpnOp::ExprPrimitive(num) => exprs.push(Expr::ExprPrimitive(num)),
             RpnOp::Add => { build_ast_binary(&mut exprs, |a, b| a + b) },
@@ -427,6 +428,10 @@ fn test_parse() {
     parser_assert_eq!("2.5 3 **", "(3 ** 2.5)", Some(15.588457268119896));
 }
 
-fn main() {
-    
+fn main() -> io::Result<()> {
+    for line in io::stdin().lines() {
+        let arith = parse(line?);
+        println!("{} = {}", arith.to_string(), arith.eval());
+    }
+    Ok(())
 }
