@@ -118,6 +118,73 @@ impl Ord for CastType {
     }
 }
 
+#[derive(Clone)]
+struct Fraction {
+    top: i64,
+    bottom: i64,
+}
+
+fn gcd(a: i64, b: i64) -> i64 {
+    let (x, y) = if a > b { (a, b) } else { (b, a) }; // x > y
+    if y == 0 { x } else { gcd(y, x % y) } // TODO: ループで実装
+}
+
+impl Fraction {
+    // TODO: パフォーマンス課題
+    fn simplify(self) -> Fraction {
+        let Fraction { top: a, bottom: b } = self.clone();
+        let g = gcd(a, b);
+        Fraction {
+            top: a/g,
+            bottom: b/g,
+        }
+    }
+}
+
+impl Add for Fraction {
+    type Output = Fraction;
+    fn add(self, other: Fraction) -> Fraction {
+        let frac = Fraction {
+            top: (self.top * other.bottom + self.bottom * other.top),
+            bottom: self.bottom * other.bottom,
+        };
+        frac.simplify()
+    }
+}
+
+impl Sub for Fraction {
+    type Output = Fraction;
+    fn sub(self, other: Fraction) -> Fraction {
+        let frac = Fraction {
+            top: (self.top * other.bottom - self.bottom * other.top),
+            bottom: self.bottom * other.bottom,
+        };
+        frac.simplify()
+    }
+}
+
+impl Mul for Fraction {
+    type Output = Fraction;
+    fn mul(self, other: Fraction) -> Fraction {
+        let frac = Fraction {
+            top: self.top * other.top,
+            bottom: self.bottom * other.bottom,
+        };
+        frac.simplify()
+    }
+}
+
+impl Div for Fraction {
+    type Output = Fraction;
+    fn div(self, other: Fraction) -> Fraction {
+        let frac = Fraction {
+            top: self.top * other.bottom,
+            bottom: self.bottom * other.top,
+        };
+        frac.simplify()
+    }
+}
+
 macro_rules! impl_number_ops {
     (@binary $trait_name:ident $method_name:ident) => {
         impl $trait_name for ExprPrimitive {
