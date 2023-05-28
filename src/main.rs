@@ -151,8 +151,7 @@ impl Fraction {
 
 impl From<ExprPrimitive> for Option<Fraction> {
     fn from(value: ExprPrimitive) -> Option<Fraction> {
-        let ExprPrimitive { primitive: primitive, .. } = value;
-        if let Primitive::Fraction(val) = primitive { Some(val) } else { None }
+        if let Primitive::Fraction(val) = value.primitive { Some(val) } else { None }
     }
 }
 
@@ -203,7 +202,7 @@ impl Div for Fraction {
 // TODO: 実装存在しない場合の処理検討
 impl Rem for Fraction {
     type Output = Fraction;
-    fn rem(self, other: Fraction) -> Fraction {
+    fn rem(self, _other: Fraction) -> Fraction {
         unimplemented!()
     }
 }
@@ -211,7 +210,7 @@ impl Rem for Fraction {
 // TODO: 実装存在しない場合の処理検討
 impl Pow for Fraction {
     type Output = Fraction;
-    fn pow(self, other: Fraction) -> Fraction {
+    fn pow(self, _other: Fraction) -> Fraction {
         unimplemented!()
     }
 }
@@ -393,7 +392,7 @@ impl fmt::Display for Expr {
             Self::Pow(ref a, ref b)  => write!(f, "({} ** {})", *a, *b),
             Self::Exp(ref a) => write!(f, "exp({})", *a),
             Self::Ln(ref a) => write!(f, "ln({})", *a),
-            Self::FracDiv(ref a, ref b) => write!(f, "({} // {})", *a, *b),
+            Self::FracDiv(ref a, ref b) => write!(f, "({} / {})", *a, *b),
         }
     }
 }
@@ -583,8 +582,9 @@ fn test_parse() {
     parser_assert_eq!("5 3 **", "(3 ** 5)", Some(243));
     parser_assert_eq!("4 2.21234 **", "(2.21234 ** 4)", Some(23.955623922523824));
     parser_assert_eq!("2.5 3 **", "(3 ** 2.5)", Some(15.588457268119896));
-    parser_assert_eq!("3 5 //", "(5 // 3)", Some(Fraction::new(5, 3)));
-    parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 // 3) + (8 // 7)) * (5 // 3))", Some(Fraction::new(260, 63)));
+    parser_assert_eq!("3 5 //", "(5 / 3)", Some(Fraction::new(5, 3)));
+    parser_assert_eq!("5 3 // 12 11 // +", "((11 / 12) + (3 / 5))", Some(Fraction::new(91, 60)));
+    parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 / 3) + (8 / 7)) * (5 / 3))", Some(Fraction::new(260, 63)));
 }
 
 fn main() -> io::Result<()> {
