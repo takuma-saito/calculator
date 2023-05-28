@@ -281,28 +281,24 @@ fn parse(text: &str) -> Expr {
     exprs.pop().unwrap() // TODO: stack のチェック
 }
 
+macro_rules! parser_assert_eq {
+    ($input:expr, $display_expected_value:expr, $eval_expected_value:expr) => {
+        let arith = parse($input);
+        assert_eq!($display_expected_value, format!("{}", arith));
+        assert_eq!($eval_expected_value, arith.eval().into());
+    }
+}
+
 #[test]
-fn test() {
-    let mut arith = parse("1 2 +");
-    assert_eq!("(2 + 1)", format!("{}", arith));
-    assert_eq!(Some(3_i64), arith.eval().into());
-    arith = parse("3 4 + 1 2 - *");
-    assert_eq!("((2 - 1) * (4 + 3))", format!("{}", arith));
-    assert_eq!(Some(7_i64), arith.eval().into());
-    arith = parse("3 6 / 1 4 - * 10 +");
-    assert_eq!("(10 + ((4 - 1) * (6 / 3)))", format!("{}", arith));
-    assert_eq!(Some(16_i64), arith.eval().into());
+fn test_parse() {
+    parser_assert_eq!("1 2 +", "(2 + 1)", Some(3_i64));
+    parser_assert_eq!("3 4 + 1 2 - *", "((2 - 1) * (4 + 3))", Some(7_i64));
+    parser_assert_eq!("3 6 / 1 4 - * 10 +", "(10 + ((4 - 1) * (6 / 3)))", Some(16_i64));
+    parser_assert_eq!("3.1 2.4 +", "(2.4 + 3.1)", Some(5.5_f64));
+    parser_assert_eq!("-1", "-1", Some(-1));
+    parser_assert_eq!("-1.234 1.534 *", "(1.534 * -1.234)", Some(-1.892956));
+    parser_assert_eq!("-1 -1.5 *", "(-1.5 * -1)", Some(1.5));
 
-    arith = parse("3.1 2.4 +");
-    assert_eq!(Some(3.1_f64 + 2.4_f64), arith.eval().into());
-
-    arith = parse("-1");
-    assert_eq!("-1", format!("{}", arith));
-    assert_eq!(Some(-1), arith.eval().into());
-
-    arith = parse("-1.234 1.534 *");
-    assert_eq!("(1.534 * -1.234)", format!("{}", arith));
-    assert_eq!(Some(-1.892956), arith.eval().into());
 }
 
 fn main() {
