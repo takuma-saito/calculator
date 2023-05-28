@@ -175,7 +175,65 @@ enum RpnOp {
     Mul,
     Div,
 }
-fn tokenize(text: &str) -> Vec<RpnOp> {
+
+enum TokenParserState {
+    Beginning,
+    Sign(bool),
+    Decimal(i64),
+    Float(f64),
+}
+
+// @startuml
+// 
+// [*] --> Sign: {+|-}
+// [*] --> Decimal: {0-9}
+// Sign --> Decimal: {0-9}
+// Decimal --> Decimal: {0-9}
+// Float --> Float: {0-9}
+// Decimal --> Float: {.}
+// Float --> ParsedFloat: {Null}
+// Decimal --> ParsedDecimal: {Null}
+// ParsedFloat -> [*]
+// ParsedDecimal -> [*]
+// 
+// @enduml
+fn tokenize_primitive(token: &str) -> ExprPrimitive { // TODO: Result 型
+    let mut state = TokenParserState::Beginning;
+    for ch in token.chars() {
+        match state {
+            TokenParserState::Beginning => {
+                state = match ch {
+                    '-'   => TokenParserState::Sign(false),
+                    '+'   => TokenParserState::Sign(true),
+                    '0' ..= '9' => TokenParserState::Decimal(ch.to_digit(10).unwrap() as i64),
+                    _ => panic!("Unexpected token {}", ch),
+                };
+            },
+            TokenParserState::Sign(b) => {
+                let d = ch.to_digit(10).unwrap() as i64;
+                state = TokenParserState::Decimal(if b {d} else { -1 * d });
+            },
+            TokenParserState::Decimal(val) => {
+                state = if ch != '.' {
+                    let d = ch.to_digit(10).unwrap() as i64;
+                    TokenParserState::Decimal(val * 10 + d) // TODO u64 を超える場合を考慮
+                } else {
+                    TokenParserState::Float(val as f64)
+                };
+            },
+            TokenParserState::Float(val) => {
+                let newval = val * 10.0 + f64::from(ch.to_digit(10).unwrap()); // TODO: f64 を超える場合を考慮
+                state = TokenParserState::Float(newval);
+            },
+        }
+    }
+    match state {
+        TokenParserState::Decimal(val) => val.into(),
+        TokenParserState::Float(val)   => val.into(),
+        _ => panic!("Parse Faild"), // TODO: 適切なエラーを返却
+    }
+}
+fn tokenize(text: &str) -> Vec<RpnOp> { // TODO: Result 型
     let mut i = 0usize;
     let mut ops = vec![];
     for token in text.split_whitespace() {
@@ -186,8 +244,7 @@ fn tokenize(text: &str) -> Vec<RpnOp> {
             "*" => RpnOp::Mul,
             "/" => RpnOp::Div,
             _ => {
-                let value = token.parse::<i64>().unwrap();
-                RpnOp::ExprPrimitive(value.into())
+                RpnOp::ExprPrimitive(tokenize_primitive(token))
             }
         };
         ops.push(rpn_op);
