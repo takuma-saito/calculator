@@ -2,7 +2,6 @@
 use std::io;
 use std::fmt;
 use std::ops::{Add, Sub, Mul, Div, Rem};
-use std::cmp::Ordering;
 
 enum Expr {
     Primitive(Primitive),
@@ -95,7 +94,7 @@ struct Fraction {
 }
 
 fn gcd(a: i64, b: i64) -> i64 {
-    let (x, y) = if a > b { (a, b) } else { (b, a) }; // x > y
+    let (x, y) = if a.abs() > b.abs() { (a, b) } else { (b, a) }; // x > y
     if y == 0 { x } else { gcd(y, x % y) } // TODO: ループで実装
 }
 
@@ -182,7 +181,7 @@ impl Pow for Fraction {
 
 impl fmt::Display for Fraction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}//{})", self.top, self.bottom)
+        write!(f, "({}/{})", self.top, self.bottom)
     }
 }
 
@@ -333,15 +332,15 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Primitive(num) => write!(f, "{}", num),
-            Self::Add(ref a, ref b)  => write!(f, "({} + {})", *a, *b),
-            Self::Sub(ref a, ref b)  => write!(f, "({} - {})", *a, *b),
-            Self::Mul(ref a, ref b)  => write!(f, "({} * {})", *a, *b),
-            Self::Div(ref a, ref b)  => write!(f, "({} / {})", *a, *b),
-            Self::Rem(ref a, ref b)  => write!(f, "({} % {})", *a, *b),
-            Self::Pow(ref a, ref b)  => write!(f, "({} ** {})", *a, *b),
-            Self::Exp(ref a) => write!(f, "exp({})", *a),
-            Self::Ln(ref a) => write!(f, "ln({})", *a),
-            Self::FracDiv(ref a, ref b) => write!(f, "({} / {})", *a, *b),
+            Self::Add(a, b)  => write!(f, "({} + {})", *a, *b),
+            Self::Sub(a, b)  => write!(f, "({} - {})", *a, *b),
+            Self::Mul(a, b)  => write!(f, "({} * {})", *a, *b),
+            Self::Div(a, b)  => write!(f, "({} / {})", *a, *b),
+            Self::Rem(a, b)  => write!(f, "({} % {})", *a, *b),
+            Self::Pow(a, b)  => write!(f, "({} ** {})", *a, *b),
+            Self::Exp(a) => write!(f, "exp({})", *a),
+            Self::Ln(a) => write!(f, "ln({})", *a),
+            Self::FracDiv(a, b) => write!(f, "({} / {})", *a, *b),
         }
     }
 }
@@ -401,15 +400,15 @@ enum TokenParserState {
 // @startuml
 // 
 // [*] --> Sign: {+|-}
-// [*] --> Decimal: {0-9}
-// Sign --> Decimal: {0-9}
-// Decimal --> Decimal: {0-9}
+// [*] --> NatNum: {0-9}
+// Sign --> NatNum: {0-9}
+// NatNum --> NatNum: {0-9}
 // Float --> Float: {0-9}
-// Decimal --> Float: {.}
+// NatNum --> Float: {.}
 // Float --> ParsedFloat: {Null}
-// Decimal --> ParsedDecimal: {Null}
+// NatNum --> ParsedNatNum: {Null}
 // ParsedFloat -> [*]
-// ParsedDecimal -> [*]
+// ParsedNatNum -> [*]
 // 
 // @enduml
 fn tokenize_primitive(token: &str) -> Primitive { // TODO: Result 型
@@ -532,6 +531,7 @@ fn test_parse() {
     parser_assert_eq!("4 2.21234 **", "(2.21234 ** 4)", Some(23.955623922523824));
     parser_assert_eq!("2.5 3 **", "(3 ** 2.5)", Some(15.588457268119896));
     parser_assert_eq!("3 5 //", "(5 / 3)", Some(Fraction::new(5, 3)));
+    parser_assert_eq!("-3 5 //", "(5 / -3)", Some(Fraction::new(5, -3)));
     parser_assert_eq!("5 3 // 12 11 // +", "((11 / 12) + (3 / 5))", Some(Fraction::new(91, 60)));
     parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 / 3) + (8 / 7)) * (5 / 3))", Some(Fraction::new(260, 63)));
 }
