@@ -16,6 +16,83 @@ enum Expr {
     Ln(Box<Expr>),
 }
 
+struct BigNum {
+    val: Vec<u8>,
+    sign: i8,
+}
+
+impl BigNum {
+    fn new_from_str(source: &str) -> Option<Self> {
+        //let mut ret = vec![];
+        for ch in source.chars() {
+            // if !ch.is_digit(10) { return None; }
+            // let d = ch.to_digit(10).unwrap();
+            // ret.push();
+        }
+        unimplemented!()
+    }
+}
+
+impl fmt::Display for BigNum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut carry = 0_u32;
+        let mut ret = vec![];
+        for u in self.val.iter() {
+            carry += *u as u32;
+            while carry > 9_u32 {
+                ret.push(char::from_digit(carry % 10, 10).unwrap());
+                carry /= 10;
+            }
+        }
+        write!(f, "{}", ret.into_iter().collect::<String>())
+    }
+}
+
+impl Add for BigNum {
+    type Output = BigNum;
+    fn add(self, other: BigNum) -> BigNum {
+        let (x, y) = if self.val.len() >= other.val.len() { (self, other) } else { (other, self) };
+        let mut carry = 0_u32;
+        let mut i = 0_usize;
+        let mut ret = vec![0; x.val.len()];
+        while i < x.val.len() {
+            carry = ret[i] as u32;
+            carry += x.val[i] as u32;
+            carry += *y.val.get(i).unwrap_or(&0) as u32;
+            let mut j = i;
+            while carry != 0 && j < y.val.len() {
+                carry += ret[j] as u32;
+                ret[j] = (carry & 0xff_32) as u8;
+                carry >>= 4;
+                j += 1;
+            }
+            i += 1;
+        }
+        Self { val: ret, sign: 1_i8 }
+    }
+}
+
+impl Sub for BigNum {
+    type Output = BigNum;
+    fn sub(self, other: BigNum) -> BigNum {
+        unimplemented!();
+    }
+}
+
+impl Mul for BigNum {
+    type Output = BigNum;
+    fn mul(self, other: BigNum) -> BigNum {
+        unimplemented!();
+    }
+}
+
+impl Div for BigNum {
+    type Output = BigNum;
+    fn div(self, other: BigNum) -> BigNum {
+        unimplemented!();
+    }
+}
+
 impl From<i64> for Primitive {
     fn from(value: i64) -> Self {
         Primitive::I64(value)
@@ -534,6 +611,11 @@ fn test_parse() {
     parser_assert_eq!("-3 5 //", "(5 / -3)", Some(Fraction::new(5, -3)));
     parser_assert_eq!("5 3 // 12 11 // +", "((11 / 12) + (3 / 5))", Some(Fraction::new(91, 60)));
     parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 / 3) + (8 / 7)) * (5 / 3))", Some(Fraction::new(260, 63)));
+}
+
+#[test]
+fn test_bignum() {
+
 }
 
 fn main() -> io::Result<()> {
