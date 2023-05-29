@@ -22,29 +22,48 @@ struct BigNum {
 }
 
 impl BigNum {
-    fn new_from_str(source: &str) -> Option<Self> {
-        //let mut ret = vec![];
-        for ch in source.chars() {
-            // if !ch.is_digit(10) { return None; }
-            // let d = ch.to_digit(10).unwrap();
-            // ret.push();
+    fn new(source: &str) -> Self {
+        let mut ret = vec![0; (10_f64.ln() / 256_f64.ln()) as usize + 1_usize];
+        let len = source.len();
+        for ch in source.chars().rev() {
+            assert!(!ch.is_digit(10)); // TODO
+            let mut carry = ch.to_digit(10).unwrap();
+            let mut j = 0_usize;
+            while j < len { // b256 = 10 * b256 + carry
+                carry += (ret[j] as u32) * 10_u32;
+                ret[j] = (carry & 0xff_u32) as u8;
+                carry >>= 4;
+                j += 1;
+            }
         }
-        unimplemented!()
+        while let Some(u) = ret.last() {
+            if *u == 0 { ret.pop(); } else { break; }
+        }
+        Self { val: ret, sign: 1_i8 }
     }
 }
 
 impl fmt::Display for BigNum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut carry = 0_u32;
-        let mut ret = vec![];
-        for u in self.val.iter() {
-            carry += *u as u32;
-            while carry > 9_u32 {
-                ret.push(char::from_digit(carry % 10, 10).unwrap());
+        let mut ret = vec![0; (256_f64.ln() / 10_f64.ln()) as usize + 1_usize];
+        let mut i = 0_usize;
+        let len = self.val.len();
+        while i < len {
+            let mut carry = self.val[len - i - 1] as u32;
+            let mut j = 0_usize;
+            while j < len { // b10 = 256 * b10 + carry
+                carry += (ret[j] as u32) << 4;
+                ret[j] = (carry % 10) as u8;
                 carry /= 10;
+                j += 1;
             }
+            i += 1;
         }
-        write!(f, "{}", ret.into_iter().collect::<String>())
+        while let Some(u) = ret.last() {
+            if *u == 0 { ret.pop(); } else { break; }
+        }
+        write!(f, "{}", String::from_utf8(ret).unwrap())
     }
 }
 
@@ -58,7 +77,7 @@ impl Add for BigNum {
         while i < x.val.len() {
             carry = ret[i] as u32;
             carry += x.val[i] as u32;
-            carry += *y.val.get(i).unwrap_or(&0) as u32;
+            carry += *y.val.get(i).unwrap_or(&0) as u32; // TODO: Vec<T> から index にアクセスして Option<T> を取得することは可能？
             let mut j = i;
             while carry != 0 && j < y.val.len() {
                 carry += ret[j] as u32;
@@ -257,13 +276,13 @@ impl Pow for Fraction {
 }
 
 impl fmt::Display for Fraction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}/{})", self.top, self.bottom)
     }
 }
 
 impl fmt::Display for Primitive {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::I64(val) => write!(f, "{}", val),
             Self::F64(val) => write!(f, "{}", val),
