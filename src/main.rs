@@ -22,29 +22,28 @@ struct BigNum {
 }
 
 fn debug(vec: &Vec<u8>) {
-    println!("0x[{}]", vec.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join(" "));
+    println!("0x[{}]", vec.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(" "));
 }
 
 impl BigNum {
     fn new<F: AsRef<str>>(text: F) -> Self {
         let source = text.as_ref();
         let len = source.len();
-        let mut ret = vec![0; ((10_f64.ln() / 256_f64.ln()) as usize + 2_usize* len)];
-        for ch in source.chars().rev() {
+        let mut ret = vec![0_u8; ((10_f64.ln() / 256_f64.ln()) as usize + 2_usize) * len];
+        for ch in source.chars() {
             assert!(ch.is_digit(10)); // TODO
-            let mut carry = ch.to_digit(10).unwrap();
+            let mut carry = ch.to_digit(10).unwrap() as u32;
             let mut j = 0_usize;
             while j < ret.len() { // b256 = 10 * b256 + carry
                 carry += (ret[j] as u32) * 10_u32;
                 ret[j] = (carry & 0xff_u32) as u8;
-                carry >>= 4;
+                carry >>= 8;
                 j += 1;
             }
         }
         while let Some(u) = ret.last() {
             if *u == 0 { ret.pop(); } else { break; }
         }
-        debug(&ret);
         Self { val: ret, sign: 1_i8 }
     }
 }
@@ -58,8 +57,8 @@ impl fmt::Display for BigNum {
         while i < len {
             let mut carry = self.val[len - i - 1] as u32;
             let mut j = 0_usize;
-            while j < len { // b10 = 256 * b10 + carry
-                carry += (ret[j] as u32) << 4;
+            while j < ret.len() { // b10 = 256 * b10 + carry
+                carry += (ret[j] as u32) << 8;
                 ret[j] = (carry % 10) as u8;
                 carry /= 10;
                 j += 1;
@@ -69,7 +68,7 @@ impl fmt::Display for BigNum {
         while let Some(u) = ret.last() {
             if *u == 0 { ret.pop(); } else { break; }
         }
-        write!(f, "{}", String::from_utf8(ret).unwrap())
+        write!(f, "{}", ret.iter().rev().map(|x| (x + '0' as u8) as char).collect::<String>())
     }
 }
 
@@ -88,7 +87,7 @@ impl Add for BigNum {
             while carry != 0 && j < y.val.len() {
                 carry += ret[j] as u32;
                 ret[j] = (carry & 0xff_32) as u8;
-                carry >>= 4;
+                carry >>= 8;
                 j += 1;
             }
             i += 1;
