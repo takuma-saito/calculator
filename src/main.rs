@@ -52,7 +52,7 @@ impl BigNum {
     }
 
     fn new_from_u32(val: u32) -> Self {
-        let mut ret = vec![0_u8; 4];
+        let mut ret = vec![];
         for (i, bitmask) in
             [0xff_u32, 0xff00_u32, 0xff0000_u32, 0xff000000_u32]
             .iter().enumerate() {
@@ -63,7 +63,7 @@ impl BigNum {
     }
 
     fn new_from_u64(val: u64) -> Self {
-        let mut ret = vec![0_u8; 8];
+        let mut ret = vec![];
         for (i, bitmask) in
             [
                 0xff_u64, 0xff00_u64, 0xff0000_u64, 0xff000000_u64,
@@ -79,7 +79,6 @@ impl BigNum {
 
 impl fmt::Display for BigNum {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut carry = 0_u32;
         let len = self.val.len();
         let mut ret = vec![0; ((256_f64.ln() / 10_f64.ln()) as usize + 2_usize) * len];
         for i in 0..len {
@@ -100,7 +99,6 @@ impl Add for BigNum {
     fn add(self, other: BigNum) -> BigNum {
         let (x, y) = if self.val.len() >= other.val.len() { (self, other) } else { (other, self) };
         let mut carry = 0_u32;
-        let mut i = 0_usize;
         let mut ret = vec![0; x.val.len()];
         let len = x.val.len();
         for i in 0..len {
@@ -114,6 +112,7 @@ impl Add for BigNum {
                 j += 1;
             }
         }
+        Self::trailing_zero(&mut ret);
         Self { val: ret, sign: 1_i8 }
     }
 }
@@ -134,34 +133,35 @@ impl Mul for BigNum {
             assert!(carry < 256); // TODO
             ret[i+x.val.len()] = carry as u8;
         }
+        Self::trailing_zero(&mut ret);
         Self { val: ret, sign: 1_i8 }
     }
 }
 
 impl Sub for BigNum {
     type Output = BigNum;
-    fn sub(self, other: BigNum) -> BigNum {
+    fn sub(self, _other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
 
 impl Div for BigNum {
     type Output = BigNum;
-    fn div(self, other: BigNum) -> BigNum {
+    fn div(self, _other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
 
 impl Pow for BigNum {
     type Output = BigNum;
-    fn pow(self, other: BigNum) -> BigNum {
+    fn pow(self, _other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
 
 impl Rem for BigNum {
     type Output = BigNum;
-    fn rem(self, other: BigNum) -> BigNum {
+    fn rem(self, _other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
@@ -180,6 +180,14 @@ fn test_bignum() {
         format!("{}", BigNum::new("123456789") * BigNum::new("123456789")));
     assert_eq!("15241578780673678546105778281054720515622620750190521".to_string(),
         format!("{}", BigNum::new("123456789123456789123456789") * BigNum::new("123456789123456789123456789")));
+}
+
+#[test]
+fn test_bignum_new() {
+    assert_eq!("123456789",
+        format!("{}", BigNum::new_from_u32(123456789_u32)));
+    assert_eq!("123456789123456789",
+        format!("{}", BigNum::new_from_u64(123456789123456789_u64)));
 }
 
 impl From<i64> for Primitive {
@@ -249,7 +257,7 @@ impl Primitive {
             Primitive::F64(val) => *val,
             Primitive::I64(val) => (*val) as f64,
             Primitive::Fraction(frac) => (frac.top as f64) / (frac.bottom as f64),
-            Primitive::BigNum(val) => todo!(),
+            Primitive::BigNum(_val) => todo!(),
         }
     }
     fn as_i64(&self) -> i64 {
@@ -257,7 +265,7 @@ impl Primitive {
             Primitive::F64(val) => (*val) as i64,
             Primitive::I64(val) => *val,
             Primitive::Fraction(frac) => frac.top / frac.bottom,
-            Primitive::BigNum(val) => todo!(),
+            Primitive::BigNum(_val) => todo!(),
         }
     }
 }
@@ -628,7 +636,7 @@ fn tokenize_primitive(token: &str) -> Primitive { // TODO: Result 型
     match state {
         TokenParserState::NatNum(sign, val)  => 
             (if sign { val as i64 } else { -(val as i64) }).into(),
-        TokenParserState::BigNum(sign, val)  => {
+        TokenParserState::BigNum(_sign, val)  => {
             let digits = val.into_iter().collect::<String>();
             Primitive::BigNum(BigNum::new(digits))
         }
