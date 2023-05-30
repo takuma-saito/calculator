@@ -16,6 +16,7 @@ enum Expr {
     Ln(Box<Expr>),
 }
 
+#[derive(Debug, PartialEq)]
 struct BigNum {
     val: Vec<u8>,
     sign: i8, // TODO
@@ -151,6 +152,20 @@ impl Div for BigNum {
     }
 }
 
+impl Pow for BigNum {
+    type Output = BigNum;
+    fn pow(self, other: BigNum) -> BigNum {
+        unimplemented!();
+    }
+}
+
+impl Rem for BigNum {
+    type Output = BigNum;
+    fn rem(self, other: BigNum) -> BigNum {
+        unimplemented!();
+    }
+}
+
 #[test]
 fn test_bignum() {
     assert_eq!("123456789",
@@ -191,6 +206,12 @@ impl From<Primitive> for Option<i64> {
     }
 }
 
+impl From<Primitive> for Option<BigNum> {
+    fn from(value: Primitive) -> Option<BigNum> {
+        if let Primitive::BigNum(val) = value { Some(val) } else { None }
+    }
+}
+
 impl From<f64> for Primitive {
     fn from(value: f64) -> Self {
         Primitive::F64(value)
@@ -227,7 +248,8 @@ impl Primitive {
         match self {
             Primitive::F64(val) => *val,
             Primitive::I64(val) => (*val) as f64,
-            Primitive::Fraction(frac) => (frac.top as f64) / (frac.bottom as f64)
+            Primitive::Fraction(frac) => (frac.top as f64) / (frac.bottom as f64),
+            Primitive::BigNum(val) => todo!(),
         }
     }
     fn as_i64(&self) -> i64 {
@@ -235,6 +257,7 @@ impl Primitive {
             Primitive::F64(val) => (*val) as i64,
             Primitive::I64(val) => *val,
             Primitive::Fraction(frac) => frac.top / frac.bottom,
+            Primitive::BigNum(val) => todo!(),
         }
     }
 }
@@ -343,6 +366,7 @@ impl fmt::Display for Primitive {
             Self::I64(val) => write!(f, "{}", val),
             Self::F64(val) => write!(f, "{}", val),
             Self::Fraction(val) => write!(f, "{}", val),
+            Self::BigNum(val) => write!(f, "{}", val),
         }
     }
 }
@@ -548,7 +572,7 @@ enum TokenParserState {
     Beginning,
     Sign(bool),
     NatNum(bool, u64),
-    BigNum(u64),
+    BigNum(bool, Vec<char>),
     Decimal(bool, u64, u64, i32),
 }
 
@@ -574,6 +598,7 @@ fn tokenize_primitive(token: &str) -> Primitive { // TODO: Result 型
                 state = match ch {
                     '-'   => TokenParserState::Sign(false),
                     '+'   => TokenParserState::Sign(true),
+                    'b'   => TokenParserState::BigNum(true, vec![]),
                     '0' ..= '9' => TokenParserState::NatNum(true, ch.to_digit(10).unwrap() as u64),
                     _ => panic!("Unexpected token {}", ch),
                 };
@@ -590,6 +615,10 @@ fn tokenize_primitive(token: &str) -> Primitive { // TODO: Result 型
                     TokenParserState::Decimal(sign, val, 0_u64, 0)
                 };
             },
+            TokenParserState::BigNum(sign, mut val) => {
+                val.push(ch);
+                state = TokenParserState::BigNum(sign, val);
+            }
             TokenParserState::Decimal(sign, val, decimal_val, pos) => {
                 let new_decimal_val = 10_u64 * decimal_val + (ch.to_digit(10).unwrap() as u64); // TODO: f64 を超える場合を考慮
                 state = TokenParserState::Decimal(sign, val, new_decimal_val, pos - 1);
@@ -599,6 +628,10 @@ fn tokenize_primitive(token: &str) -> Primitive { // TODO: Result 型
     match state {
         TokenParserState::NatNum(sign, val)  => 
             (if sign { val as i64 } else { -(val as i64) }).into(),
+        TokenParserState::BigNum(sign, val)  => {
+            let digits = val.into_iter().collect::<String>();
+            Primitive::BigNum(BigNum::new(digits))
+        }
         TokenParserState::Decimal(sign, val, decimal_val, pos) => {
             let v = (val as f64) + (decimal_val as f64) * (10.0_f64).powi(pos);
             let ret = if sign { v } else { -v };
@@ -689,6 +722,7 @@ fn test_parse() {
     parser_assert_eq!("-3 5 //", "(5 / -3)", Some(Fraction::new(5, -3)));
     parser_assert_eq!("5 3 // 12 11 // +", "((11 / 12) + (3 / 5))", Some(Fraction::new(91, 60)));
     parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 / 3) + (8 / 7)) * (5 / 3))", Some(Fraction::new(260, 63)));
+    parser_assert_eq!("b1 b2 +", "(2 + 1)", Some(BigNum::new_from_u32(3_u32)));
 }
 
 fn main() -> io::Result<()> {
