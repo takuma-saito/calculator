@@ -18,18 +18,23 @@ enum Expr {
 
 struct BigNum {
     val: Vec<u8>,
-    sign: i8,
+    sign: i8, // TODO
+}
+
+fn debug(vec: &Vec<u8>) {
+    println!("0x[{}]", vec.iter().map(|x| format!("{:x}", x)).collect::<Vec<String>>().join(" "));
 }
 
 impl BigNum {
-    fn new(source: &str) -> Self {
-        let mut ret = vec![0; (10_f64.ln() / 256_f64.ln()) as usize + 1_usize];
+    fn new<F: AsRef<str>>(text: F) -> Self {
+        let source = text.as_ref();
         let len = source.len();
+        let mut ret = vec![0; ((10_f64.ln() / 256_f64.ln()) as usize + 2_usize* len)];
         for ch in source.chars().rev() {
-            assert!(!ch.is_digit(10)); // TODO
+            assert!(ch.is_digit(10)); // TODO
             let mut carry = ch.to_digit(10).unwrap();
             let mut j = 0_usize;
-            while j < len { // b256 = 10 * b256 + carry
+            while j < ret.len() { // b256 = 10 * b256 + carry
                 carry += (ret[j] as u32) * 10_u32;
                 ret[j] = (carry & 0xff_u32) as u8;
                 carry >>= 4;
@@ -39,6 +44,7 @@ impl BigNum {
         while let Some(u) = ret.last() {
             if *u == 0 { ret.pop(); } else { break; }
         }
+        debug(&ret);
         Self { val: ret, sign: 1_i8 }
     }
 }
@@ -46,9 +52,9 @@ impl BigNum {
 impl fmt::Display for BigNum {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut carry = 0_u32;
-        let mut ret = vec![0; (256_f64.ln() / 10_f64.ln()) as usize + 1_usize];
-        let mut i = 0_usize;
         let len = self.val.len();
+        let mut ret = vec![0; ((256_f64.ln() / 10_f64.ln()) as usize + 2_usize) * len];
+        let mut i = 0_usize;
         while i < len {
             let mut carry = self.val[len - i - 1] as u32;
             let mut j = 0_usize;
@@ -91,16 +97,16 @@ impl Add for BigNum {
     }
 }
 
-impl Sub for BigNum {
+impl Mul for BigNum {
     type Output = BigNum;
-    fn sub(self, other: BigNum) -> BigNum {
+    fn mul(self, other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
 
-impl Mul for BigNum {
+impl Sub for BigNum {
     type Output = BigNum;
-    fn mul(self, other: BigNum) -> BigNum {
+    fn sub(self, other: BigNum) -> BigNum {
         unimplemented!();
     }
 }
@@ -110,6 +116,18 @@ impl Div for BigNum {
     fn div(self, other: BigNum) -> BigNum {
         unimplemented!();
     }
+}
+
+#[test]
+fn test_bignum() {
+    assert_eq!("123456789",
+        format!("{}", BigNum::new("123456789")));
+    assert_eq!("123456789123456789123456789",
+        format!("{}", BigNum::new("123456789123456789123456789")));
+    assert_eq!("135802578",
+        format!("{}", BigNum::new("123456789") + BigNum::new("123456789")));
+    assert_eq!("246913578246913578246913578".to_string(),
+        format!("{}", BigNum::new("123456789123456789123456789") + BigNum::new("123456789123456789123456789")));
 }
 
 impl From<i64> for Primitive {
@@ -630,11 +648,6 @@ fn test_parse() {
     parser_assert_eq!("-3 5 //", "(5 / -3)", Some(Fraction::new(5, -3)));
     parser_assert_eq!("5 3 // 12 11 // +", "((11 / 12) + (3 / 5))", Some(Fraction::new(91, 60)));
     parser_assert_eq!("3 5 // 7 8 // 3 4 // + *", "(((4 / 3) + (8 / 7)) * (5 / 3))", Some(Fraction::new(260, 63)));
-}
-
-#[test]
-fn test_bignum() {
-
 }
 
 fn main() -> io::Result<()> {
