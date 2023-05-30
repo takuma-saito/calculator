@@ -26,6 +26,13 @@ fn debug(vec: &Vec<u8>) {
 }
 
 impl BigNum {
+
+    fn trailing_zero(vec: &mut Vec<u8>) {
+        while let Some(u) = vec.last() {
+            if *u == 0 { vec.pop(); } else { break; }
+        }
+    }
+
     fn new<F: AsRef<str>>(text: F) -> Self {
         let source = text.as_ref();
         let len = source.len();
@@ -39,9 +46,32 @@ impl BigNum {
                 carry >>= 8;
             }
         }
-        while let Some(u) = ret.last() {
-            if *u == 0 { ret.pop(); } else { break; }
+        Self::trailing_zero(&mut ret);
+        Self { val: ret, sign: 1_i8 }
+    }
+
+    fn new_from_u32(val: u32) -> Self {
+        let mut ret = vec![0_u8; 4];
+        for (i, bitmask) in
+            [0xff_u32, 0xff00_u32, 0xff0000_u32, 0xff000000_u32]
+            .iter().enumerate() {
+            ret.push(((val & bitmask) >> (i*8)) as u8);
         }
+        Self::trailing_zero(&mut ret);
+        Self { val: ret, sign: 1_i8 }
+    }
+
+    fn new_from_u64(val: u64) -> Self {
+        let mut ret = vec![0_u8; 8];
+        for (i, bitmask) in
+            [
+                0xff_u64, 0xff00_u64, 0xff0000_u64, 0xff000000_u64,
+                0xff00000000_u64, 0xff0000000000_u64, 0xff000000000000_u64, 0xff00000000000000_u64
+            ]
+            .iter().enumerate() {
+            ret.push(((val & bitmask) >> (i*8)) as u8);
+        }
+        Self::trailing_zero(&mut ret);
         Self { val: ret, sign: 1_i8 }
     }
 }
@@ -59,9 +89,7 @@ impl fmt::Display for BigNum {
                 carry /= 10;
             }
         }
-        while let Some(u) = ret.last() {
-            if *u == 0 { ret.pop(); } else { break; }
-        }
+        Self::trailing_zero(&mut ret);
         write!(f, "{}", ret.iter().rev().map(|x| (x + '0' as u8) as char).collect::<String>())
     }
 }
@@ -191,6 +219,7 @@ enum Primitive {
     I64(i64),
     F64(f64),
     Fraction(Fraction),
+    BigNum(BigNum),
 }
 
 impl Primitive {
@@ -335,6 +364,8 @@ macro_rules! impl_number_ops {
             type Output = Primitive;
             fn $method_name(self, other: Primitive) -> Primitive {
                 match (self, other) {
+                    (Primitive::BigNum(x), Primitive::BigNum(y)) =>
+                        Primitive::BigNum($trait_name::$method_name(x, y)),
                     (Primitive::I64(x), Primitive::I64(y)) =>
                         Primitive::I64($trait_name::$method_name(x, y)),
                     (Primitive::F64(x), Primitive::F64(y)) =>
@@ -517,6 +548,7 @@ enum TokenParserState {
     Beginning,
     Sign(bool),
     NatNum(bool, u64),
+    BigNum(u64),
     Decimal(bool, u64, u64, i32),
 }
 
