@@ -92,11 +92,20 @@ impl Add for BigNum {
 impl Mul for BigNum {
     type Output = BigNum;
     fn mul(self, other: BigNum) -> BigNum {
-        // let (x, y) = if self.val.len() >= other.val.len() { (self, other) } else { (other, self) };
-        // let mut ret = vec![0; x.val.len() * 2];
-        // let mut i = 0_usize;
-        // while 
-        unimplemented!()
+        let (x, y) = if self.val.len() >= other.val.len() { (self, other) } else { (other, self) };
+        let mut ret = vec![0; x.val.len() * 2 + 1];
+        for i in 0..y.val.len() {
+            let mut carry = 0_u32;
+            let u = y.val[i];
+            for j in 0..x.val.len() {
+                carry += (u as u32) * (x.val[j] as u32) + (ret[i+j] as u32);
+                ret[i+j] = (carry & 0xff_u32) as u8;
+                carry >>= 8;
+            }
+            assert!(carry < 256); // TODO
+            ret[i+x.val.len()] = carry as u8;
+        }
+        Self { val: ret, sign: 1_i8 }
     }
 }
 
@@ -124,6 +133,10 @@ fn test_bignum() {
         format!("{}", BigNum::new("123456789") + BigNum::new("123456789")));
     assert_eq!("246913578246913578246913578".to_string(),
         format!("{}", BigNum::new("123456789123456789123456789") + BigNum::new("123456789123456789123456789")));
+    assert_eq!("15241578750190521".to_string(),
+        format!("{}", BigNum::new("123456789") * BigNum::new("123456789")));
+    assert_eq!("15241578780673678546105778281054720515622620750190521".to_string(),
+        format!("{}", BigNum::new("123456789123456789123456789") * BigNum::new("123456789123456789123456789")));
 }
 
 impl From<i64> for Primitive {
