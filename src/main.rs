@@ -33,12 +33,10 @@ impl BigNum {
         for ch in source.chars() {
             assert!(ch.is_digit(10)); // TODO
             let mut carry = ch.to_digit(10).unwrap() as u32;
-            let mut j = 0_usize;
-            while j < ret.len() { // b256 = 10 * b256 + carry
+            for j in 0..ret.len() { // b256 = 10 * b256 + carry
                 carry += (ret[j] as u32) * 10_u32;
                 ret[j] = (carry & 0xff_u32) as u8;
                 carry >>= 8;
-                j += 1;
             }
         }
         while let Some(u) = ret.last() {
@@ -53,17 +51,13 @@ impl fmt::Display for BigNum {
         let mut carry = 0_u32;
         let len = self.val.len();
         let mut ret = vec![0; ((256_f64.ln() / 10_f64.ln()) as usize + 2_usize) * len];
-        let mut i = 0_usize;
-        while i < len {
+        for i in 0..len {
             let mut carry = self.val[len - i - 1] as u32;
-            let mut j = 0_usize;
-            while j < ret.len() { // b10 = 256 * b10 + carry
+            for j in 0..ret.len() { // b10 = 256 * b10 + carry
                 carry += (ret[j] as u32) << 8;
                 ret[j] = (carry % 10) as u8;
                 carry /= 10;
-                j += 1;
             }
-            i += 1;
         }
         while let Some(u) = ret.last() {
             if *u == 0 { ret.pop(); } else { break; }
@@ -80,7 +74,7 @@ impl Add for BigNum {
         let mut i = 0_usize;
         let mut ret = vec![0; x.val.len()];
         let len = x.val.len();
-        while i < len {
+        for i in 0..len {
             carry += x.val[i] as u32;
             carry += *y.val.get(i).unwrap_or(&0) as u32; // TODO: Vec<T> から index にアクセスして Option<T> を取得することは可能？
             let mut j = i;
@@ -90,7 +84,6 @@ impl Add for BigNum {
                 carry >>= 8;
                 j += 1;
             }
-            i += 1;
         }
         Self { val: ret, sign: 1_i8 }
     }
@@ -99,7 +92,11 @@ impl Add for BigNum {
 impl Mul for BigNum {
     type Output = BigNum;
     fn mul(self, other: BigNum) -> BigNum {
-        unimplemented!();
+        // let (x, y) = if self.val.len() >= other.val.len() { (self, other) } else { (other, self) };
+        // let mut ret = vec![0; x.val.len() * 2];
+        // let mut i = 0_usize;
+        // while 
+        unimplemented!()
     }
 }
 
