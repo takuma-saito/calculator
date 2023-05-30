@@ -79,14 +79,14 @@ impl Add for BigNum {
         let mut carry = 0_u32;
         let mut i = 0_usize;
         let mut ret = vec![0; x.val.len()];
-        while i < x.val.len() {
-            carry = ret[i] as u32;
+        let len = x.val.len();
+        while i < len {
             carry += x.val[i] as u32;
             carry += *y.val.get(i).unwrap_or(&0) as u32; // TODO: Vec<T> から index にアクセスして Option<T> を取得することは可能？
             let mut j = i;
-            while carry != 0 && j < y.val.len() {
+            while carry != 0 && j < len {
                 carry += ret[j] as u32;
-                ret[j] = (carry & 0xff_32) as u8;
+                ret[j] = (carry & 0xff_u32) as u8;
                 carry >>= 8;
                 j += 1;
             }
@@ -123,7 +123,7 @@ fn test_bignum() {
         format!("{}", BigNum::new("123456789")));
     assert_eq!("123456789123456789123456789",
         format!("{}", BigNum::new("123456789123456789123456789")));
-    assert_eq!("135802578",
+    assert_eq!("246913578",
         format!("{}", BigNum::new("123456789") + BigNum::new("123456789")));
     assert_eq!("246913578246913578246913578".to_string(),
         format!("{}", BigNum::new("123456789123456789123456789") + BigNum::new("123456789123456789123456789")));
